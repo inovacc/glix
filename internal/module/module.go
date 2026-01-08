@@ -4,11 +4,8 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
-	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -17,7 +14,7 @@ import (
 	"time"
 
 	"github.com/inovacc/goinstall/internal/database"
-	"github.com/spf13/afero"
+	"github.com/inovacc/goinstall/internal/database/sqlc"
 	"golang.org/x/mod/semver"
 )
 
@@ -25,7 +22,6 @@ const dummyModuleName = "dummy"
 
 type Module struct {
 	ctx          context.Context
-	fs           afero.Fs
 	goBinPath    string
 	timeout      time.Duration
 	Time         time.Time    `json:"time"`
@@ -51,26 +47,27 @@ type ListResp struct {
 	Versions []string  `json:"versions,omitempty"`
 }
 
-func NewModule(ctx context.Context, afs afero.Fs, goBinPath string) (*Module, error) {
+func NewModule(ctx context.Context, goBinPath string) (*Module, error) {
 	if err := validGoBinary(goBinPath); err != nil {
 		return nil, err
 	}
+
 	return &Module{
 		ctx:          ctx,
-		fs:           afs,
 		goBinPath:    goBinPath,
 		Dependencies: make([]Dependency, 0),
 	}, nil
 }
 
 func (m *Module) FetchModuleInfo(module string) error {
-	tmpDir, err := afero.TempDir(m.fs, "", "go-list")
+	tmpDir, err := os.MkdirTemp("", "go-list")
 	if err != nil {
 		return fmt.Errorf("failed to create temp dir: %w", err)
 	}
-	defer func(fs afero.Fs, path string) {
-		_ = m.fs.RemoveAll(tmpDir)
-	}(m.fs, tmpDir)
+
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
 
 	module = m.normalizeModulePath(module)
 
@@ -107,6 +104,7 @@ func (m *Module) FetchModuleInfo(module string) error {
 
 	// Extract dependencies
 	m.Dependencies, err = m.extractDependencies(ctx, tmpDir, module)
+
 	return err
 }
 
@@ -117,11 +115,13 @@ func (m *Module) InstallModule(ctx context.Context) error {
 	if gopath == "" {
 		gopath = filepath.Join(os.Getenv("HOME"), "go")
 	}
-	cmd.Env = append(os.Environ(), fmt.Sprintf("GOBIN=%s/bin", gopath))
+
+	cmd.Env = append(os.Environ(), fmt.Sprintf("GOBIN=%s", filepath.Join(gopath, "bin")))
 
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("go install failed: %w", err)
 	}
+
 	return nil
 }
 
@@ -134,23 +134,11 @@ func (m *Module) SaveToFile(path string) error {
 	if err != nil {
 		return err
 	}
-	return afero.WriteFile(m.fs, path, data, 0644)
+
+	return os.WriteFile(path, data, 0644)
 }
 
 func (m *Module) Report(db *database.Database) error {
-	tx, err := db.Begin()
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	committed := false
-	defer func() {
-		if !committed {
-			if err := tx.Rollback(); err != nil && !errors.Is(err, sql.ErrTxDone) {
-				log.Println("rollback failed:", err)
-			}
-		}
-	}()
-
 	// Serialize versions and dependencies to JSON
 	versionsJSON, err := json.Marshal(m.Versions)
 	if err != nil {
@@ -162,60 +150,79 @@ func (m *Module) Report(db *database.Database) error {
 		return fmt.Errorf("failed to marshal dependencies: %w", err)
 	}
 
-	query := `
-		INSERT INTO modules (name, version, versions, dependencies, hash, time)
-		VALUES (?, ?, ?, ?, ?, ?)
-		ON CONFLICT(name, version) DO UPDATE
-		SET hash = excluded.hash,
-			time = excluded.time,
-			versions = excluded.versions,
-			dependencies = excluded.dependencies
-		`
-	if _, err := tx.Exec(query, m.Name, m.Version, versionsJSON, depsJSON, m.Hash, m.Time); err != nil {
-		return fmt.Errorf("failed to insert module: %w", err)
-	}
-
-	depStmt := `
-		INSERT INTO dependencies (module_name, dep_name, dep_version, dep_hash)
-		VALUES (?, ?, ?, ?)
-		ON CONFLICT(module_name, dep_name) DO UPDATE
-		SET dep_version = excluded.dep_version,
-			dep_hash = excluded.dep_hash
-		`
-
-	for _, d := range m.Dependencies {
-		if _, err := tx.Exec(depStmt, m.Name, d.Name, d.Version, d.Hash); err != nil {
-			return fmt.Errorf("failed to insert dependency: %w", err)
+	// Use transaction wrapper
+	return db.WithTx(context.Background(), func(q *sqlc.Queries) error {
+		// Upsert module with type-safe parameters
+		hashPtr := &m.Hash
+		if m.Hash == "" {
+			hashPtr = nil
 		}
-	}
 
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
-	}
-	committed = true
-	return nil
+		timePtr := &m.Time
+		if m.Time.IsZero() {
+			timePtr = nil
+		}
+
+		if err := q.UpsertModule(context.Background(), sqlc.UpsertModuleParams{
+			Name:         m.Name,
+			Version:      m.Version,
+			Versions:     string(versionsJSON),
+			Dependencies: string(depsJSON),
+			Hash:         hashPtr,
+			Time:         timePtr,
+		}); err != nil {
+			return fmt.Errorf("failed to upsert module: %w", err)
+		}
+
+		// Upsert dependencies
+		for _, d := range m.Dependencies {
+			depVersionPtr := &d.Version
+			if d.Version == "" {
+				depVersionPtr = nil
+			}
+
+			depHashPtr := &d.Hash
+			if d.Hash == "" {
+				depHashPtr = nil
+			}
+
+			if err := q.UpsertDependency(context.Background(), sqlc.UpsertDependencyParams{
+				ModuleName: m.Name,
+				DepName:    d.Name,
+				DepVersion: depVersionPtr,
+				DepHash:    depHashPtr,
+			}); err != nil {
+				return fmt.Errorf("failed to upsert dependency %s: %w", d.Name, err)
+			}
+		}
+
+		return nil
+	})
 }
 
-func LoadModuleFromFile(fs afero.Fs, path string) (*Module, error) {
-	data, err := afero.ReadFile(fs, path)
+func LoadModuleFromFile(path string) (*Module, error) {
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
+
 	var mod Module
 	if err := json.Unmarshal(data, &mod); err != nil {
 		return nil, err
 	}
+
 	return &mod, nil
 }
 
 func (m *Module) dependency(module string) (*Dependency, error) {
-	tmpDir, err := afero.TempDir(m.fs, "", "go-list")
+	tmpDir, err := os.MkdirTemp("", "go-list")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create temp dir: %w", err)
 	}
-	defer func(fs afero.Fs, path string) {
-		_ = m.fs.RemoveAll(tmpDir)
-	}(m.fs, tmpDir)
+
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
 
 	ctx, cancel := context.WithTimeout(m.ctx, m.getTimeout())
 	defer cancel()
@@ -228,6 +235,7 @@ func (m *Module) dependency(module string) (*Dependency, error) {
 	}
 
 	version := m.pickVersion(suffix, lr.Versions)
+
 	return &Dependency{
 		Name:     name,
 		Hash:     m.hashModule(fmt.Sprintf("%s@%s", name, version)),
@@ -239,14 +247,18 @@ func (m *Module) dependency(module string) (*Dependency, error) {
 func (m *Module) fetchModuleVersions(ctx context.Context, dir, module string) (*ListResp, error) {
 	original := module
 	attempts := 0
+
 	const maxAttempts = 5
 
 	for {
 		cmd := exec.CommandContext(ctx, m.goBinPath, "list", "-m", "-versions", "-json", fmt.Sprintf("%s@latest", module))
 		cmd.Dir = dir
 
-		var lr ListResp
-		var out bytes.Buffer
+		var (
+			lr  ListResp
+			out bytes.Buffer
+		)
+
 		cmd.Stdout = &out
 
 		if err := cmd.Run(); err == nil {
@@ -258,6 +270,7 @@ func (m *Module) fetchModuleVersions(ctx context.Context, dir, module string) (*
 				sort.Slice(lr.Versions, func(i, j int) bool {
 					return semver.Compare(lr.Versions[i], lr.Versions[j]) > 0
 				})
+
 				return &lr, nil
 			}
 		}
@@ -267,6 +280,7 @@ func (m *Module) fetchModuleVersions(ctx context.Context, dir, module string) (*
 		if lastSlash == -1 || attempts >= maxAttempts {
 			break
 		}
+
 		module = module[:lastSlash]
 		attempts++
 	}
@@ -277,12 +291,14 @@ func (m *Module) fetchModuleVersions(ctx context.Context, dir, module string) (*
 func (m *Module) setupTempModule(ctx context.Context, dir string) error {
 	cmd := exec.CommandContext(ctx, m.goBinPath, "mod", "init", dummyModuleName)
 	cmd.Dir = dir
+
 	return cmd.Run()
 }
 
 func (m *Module) getModule(ctx context.Context, dir, moduleWithVersion string) error {
 	cmd := exec.CommandContext(ctx, m.goBinPath, "get", moduleWithVersion)
 	cmd.Dir = dir
+
 	return cmd.Run()
 }
 
@@ -296,9 +312,11 @@ func (m *Module) extractDependencies(ctx context.Context, dir, self string) ([]D
 	}
 
 	seen := make(map[string]struct{}) // module name deduplication
+
 	var deps []Dependency
-	lines := strings.Split(string(out), "\n")
-	for _, line := range lines {
+
+	lines := strings.SplitSeq(string(out), "\n")
+	for line := range lines {
 		fields := strings.Fields(line)
 		if len(fields) == 0 {
 			continue
@@ -312,6 +330,7 @@ func (m *Module) extractDependencies(ctx context.Context, dir, self string) ([]D
 		if _, ok := seen[name]; ok {
 			continue
 		}
+
 		seen[name] = struct{}{}
 
 		dep, err := m.dependency(name)
@@ -319,6 +338,7 @@ func (m *Module) extractDependencies(ctx context.Context, dir, self string) ([]D
 			deps = append(deps, *dep)
 		}
 	}
+
 	return deps, nil
 }
 
@@ -326,6 +346,7 @@ func (m *Module) getTimeout() time.Duration {
 	if m.timeout == 0 {
 		return 10 * time.Second
 	}
+
 	return m.timeout
 }
 
@@ -334,6 +355,7 @@ func (m *Module) splitModuleVersion(full string) (string, string) {
 	if len(parts) == 2 {
 		return parts[0], parts[1]
 	}
+
 	return full, "latest"
 }
 
@@ -345,9 +367,11 @@ func (m *Module) pickVersion(preferred string, versions []string) string {
 	if len(versions) > 0 {
 		return versions[0]
 	}
+
 	if preferred != "" {
 		return preferred
 	}
+
 	return ""
 }
 
@@ -357,8 +381,8 @@ func (m *Module) normalizeModulePath(input string) string {
 		"https://", "http://", "git://", "ssh://", "git@", "ssh@", "www.",
 	}
 	for _, p := range prefixes {
-		if strings.HasPrefix(input, p) {
-			input = strings.TrimPrefix(input, p)
+		if after, ok := strings.CutPrefix(input, p); ok {
+			input = after
 			break
 		}
 	}

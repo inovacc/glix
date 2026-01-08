@@ -3,12 +3,10 @@ package module
 import (
 	"context"
 	"testing"
-
-	"github.com/spf13/afero"
 )
 
 func TestModule_Check(t *testing.T) {
-	mod, err := NewModule(context.TODO(), afero.NewOsFs(), "go")
+	mod, err := NewModule(context.TODO(), "go")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -23,7 +21,7 @@ func TestModule_Check(t *testing.T) {
 }
 
 func TestModule_Check_Latest(t *testing.T) {
-	mod, err := NewModule(context.TODO(), afero.NewOsFs(), "go")
+	mod, err := NewModule(context.TODO(), "go")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -36,7 +34,7 @@ func TestModule_Check_Latest(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	mod1, err := LoadModuleFromFile(afero.NewOsFs(), "module_data_latest.json")
+	mod1, err := LoadModuleFromFile("module_data_latest.json")
 	if err != nil {
 		t.Fatal(err)
 	}

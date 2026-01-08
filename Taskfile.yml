@@ -14,8 +14,14 @@ tasks:
       - task --list
 
   # === CODE GENERATION ===
+  sqlc:generate:
+    desc: Generate sqlc type-safe database code
+    cmds:
+      - sqlc generate
+
   generate:
-    desc: Generate version information and other generated code
+    desc: Generate version information and sqlc code
+    deps: [sqlc:generate]
     cmds:
       - go generate ./...
 

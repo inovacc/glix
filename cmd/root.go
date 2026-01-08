@@ -68,6 +68,7 @@ func dbPath() string {
 		if xdgData == "" {
 			xdgData = filepath.Join(home, ".local", "share")
 		}
+
 		return filepath.Join(xdgData, "goinstall", "modules.db")
 	}
 }

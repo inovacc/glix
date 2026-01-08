@@ -13,5 +13,6 @@ func validGoBinary(name string) error {
 			return fmt.Errorf("failed to run binary %q: %w", name, err)
 		}
 	}
+
 	return nil
 }
