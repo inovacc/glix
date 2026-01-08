@@ -2,13 +2,13 @@ name: Test
 
 on:
   push:
-    branches: [ "main" ]
+    branches-ignore: [ "main" ]
   pull_request:
-    branches: [ "main" ]
+    branches-ignore: [ "main" ]
 
 jobs:
   quality-check:
-    uses: inovacc/workflows/.github/workflows/reusable-go-check.yml@v1
+    uses: inovacc/workflows/.github/workflows/reusable-go-check.yml@main
     with:
       run-tests: true
       run-lint: true

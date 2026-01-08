@@ -23,6 +23,7 @@ Installing module: github.com/inovacc/ksuid/cmd/ksuid
 Module is installer successfully: github.com/inovacc/ksuid/cmd/ksuid
 Show report using goinstall report github.com/inovacc/ksuid/cmd/ksuid
 ```
+
 ## Roadmap
 
 [x] install module

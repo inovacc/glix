@@ -4,10 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"path/filepath"
+
 	"github.com/spf13/afero"
 	"github.com/spf13/viper"
 	_ "modernc.org/sqlite"
-	"path/filepath"
 )
 
 type Database struct {

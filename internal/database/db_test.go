@@ -2,10 +2,11 @@ package database
 
 import (
 	"context"
-	"github.com/spf13/afero"
-	"github.com/spf13/viper"
 	"path/filepath"
 	"testing"
+
+	"github.com/spf13/afero"
+	"github.com/spf13/viper"
 )
 
 func TestNewDatabase(t *testing.T) {

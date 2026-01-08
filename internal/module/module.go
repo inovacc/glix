@@ -8,9 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/inovacc/goinstall/internal/database"
-	"github.com/spf13/afero"
-	"golang.org/x/mod/semver"
 	"log"
 	"os"
 	"os/exec"
@@ -18,6 +15,10 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/inovacc/goinstall/internal/database"
+	"github.com/spf13/afero"
+	"golang.org/x/mod/semver"
 )
 
 const dummyModuleName = "dummy"

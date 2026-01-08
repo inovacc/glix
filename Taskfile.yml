@@ -3,16 +3,30 @@
 version: '3'
 
 tasks:
+  prepare:
+    desc: "Prepare local dev environment after first clone (submodules, deps, codegen)"
+    cmds:
+      - git submodule sync --recursive
+      - git submodule update --init --recursive
+      - go mod download
+      - go generate ./...
+
   test:
     cmds:
-      - go test ./...
-      - golangci-lint run ./...
-
-  fmt:
-    cmds:
       - golangci-lint fmt
+      - golangci-lint run
+      - go test -race -p=1 ./...
+      - go test -race -v -bench=. -benchmem ./...
 
-  all:
-    deps:
-      - fmt
-      - test
+  upgrade:
+    cmds:
+      - go get -u ./...
+      - go mod tidy -v
+
+  build-dev:
+    cmds:
+      - goreleaser build --snapshot --clean
+
+  build-prod:
+    cmds:
+      - goreleaser --snapshot --skip-publish --rm-dist

@@ -2,8 +2,9 @@ package module
 
 import (
 	"context"
-	"github.com/spf13/afero"
 	"testing"
+
+	"github.com/spf13/afero"
 )
 
 func TestModule_Check(t *testing.T) {
