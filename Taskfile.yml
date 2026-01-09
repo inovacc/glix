@@ -14,14 +14,23 @@ tasks:
       - task --list
 
   # === CODE GENERATION ===
+  proto:generate:
+    desc: Generate Go code from protobuf definitions
+    cmds:
+      - protoc --go_out=. --go_opt=paths=source_relative internal/database/proto/database.proto
+    sources:
+      - internal/database/proto/*.proto
+    generates:
+      - internal/database/proto/*.pb.go
+
   sqlc:generate:
     desc: Generate sqlc type-safe database code
     cmds:
       - sqlc generate
 
   generate:
-    desc: Generate version information and sqlc code
-    deps: [sqlc:generate]
+    desc: Generate version information, protobuf, and sqlc code
+    deps: [proto:generate, sqlc:generate]
     cmds:
       - go generate ./...
 

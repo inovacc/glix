@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package database;
+
+option go_package = "github.com/inovacc/glix/pkg/api/v1";
+
+// ModuleProto represents an installed Go module with all its metadata
+message ModuleProto {
+  string name = 1;                     // Module path (e.g., github.com/user/repo)
+  string version = 2;                  // Installed version (e.g., v1.2.3)
+  repeated string versions = 3;        // All available versions
+  repeated DependencyProto dependencies = 4;  // Module dependencies
+  string hash = 5;                     // SHA256 hash of module@version
+  int64 timestamp_unix_nano = 6;       // Installation timestamp in Unix nanoseconds
+}
+
+// DependencyProto represents a single dependency with potential nested dependencies
+message DependencyProto {
+  string name = 1;                     // Dependency module path
+  string version = 2;                  // Dependency version
+  repeated string versions = 3;        // Available versions for this dependency
+  string hash = 4;                     // SHA256 hash of dependency@version
+  repeated DependencyProto dependencies = 5;  // Nested dependencies (recursive)
+}
+
+// DependenciesProto wraps a list of dependencies for a module
+message DependenciesProto {
+  repeated DependencyProto dependencies = 1;
+}
+
+// VersionListProto stores a list of versions for secondary indexing
+message VersionListProto {
+  repeated string versions = 1;
+}
