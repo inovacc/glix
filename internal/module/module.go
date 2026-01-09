@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -15,6 +14,7 @@ import (
 
 	"github.com/inovacc/goinstall/internal/database"
 	"github.com/inovacc/goinstall/internal/database/sqlc"
+	"github.com/inovacc/goinstall/pkg/exec"
 	"golang.org/x/mod/semver"
 )
 
@@ -78,6 +78,11 @@ func (m *Module) FetchModuleInfo(module string) error {
 	module, version := m.splitModuleVersion(module)
 	m.Name = module
 
+	// Setup dummy mod early for discovery
+	if err := m.setupTempModule(ctx, tmpDir); err != nil {
+		return err
+	}
+
 	// Get versions from upstream
 	lr, err := m.fetchModuleVersions(ctx, tmpDir, module)
 	if err != nil {
@@ -86,27 +91,28 @@ func (m *Module) FetchModuleInfo(module string) error {
 
 	// Check if the resolved module is installable (has package main)
 	// If not, trigger smart detection to find CLI paths
-	if len(m.discoveredPaths) == 0 && !m.hasPackageMain(ctx, module) {
+	if len(m.discoveredPaths) == 0 && !m.hasPackageMain(ctx, tmpDir, module) {
 		fmt.Printf("Module %q found but is not installable (no main package), searching for CLIs...\n", module)
 
-		discovered, found, discErr := m.DiscoverCLIPaths(ctx, module)
-		if discErr == nil && found && len(discovered) > 0 {
-			fmt.Printf("Found %d installable CLI(s)\n", len(discovered))
-			m.discoveredPaths = discovered
+		// Add the module to temp go.mod before discovery
+		if err := m.getModule(ctx, tmpDir, fmt.Sprintf("%s@latest", module)); err == nil {
+			discovered, found, discErr := m.DiscoverCLIPaths(ctx, tmpDir, module)
+			if discErr == nil && found && len(discovered) > 0 {
+				fmt.Printf("Found %d installable CLI(s)\n", len(discovered))
+				m.discoveredPaths = discovered
 
-			// If only one discovered, use it directly
-			if len(discovered) == 1 {
-				module = discovered[0]
-				m.Name = discovered[0]
-
-				// Re-fetch versions for the discovered path
-				lr, err = m.tryFetchVersions(ctx, tmpDir, discovered[0])
-				if err != nil {
-					return fmt.Errorf("failed to fetch versions for discovered path %q: %w", discovered[0], err)
+				// If only one discovered, use it directly
+				// Note: Don't re-fetch versions - the discovered path is a package within the module,
+				// so it uses the same versions as the root module
+				if len(discovered) == 1 {
+					module = discovered[0]
+					m.Name = discovered[0]
 				}
+			} else {
+				return fmt.Errorf("module %q is not installable and no CLI paths were discovered", module)
 			}
 		} else {
-			return fmt.Errorf("module %q is not installable and no CLI paths were discovered", module)
+			return fmt.Errorf("module %q is not installable and failed to download for discovery: %w", module, err)
 		}
 	}
 
@@ -125,12 +131,7 @@ func (m *Module) FetchModuleInfo(module string) error {
 	m.Time = time.Now()
 	m.Hash = m.hashModule(fmt.Sprintf("%s@%s", module, version))
 
-	// Setup dummy mod
-	if err := m.setupTempModule(ctx, tmpDir); err != nil {
-		return err
-	}
-
-	// Install target module in dummy
+	// Install target module in dummy (setupTempModule already called earlier)
 	if err := m.getModule(ctx, tmpDir, fmt.Sprintf("%s@%s", module, version)); err != nil {
 		return err
 	}
@@ -357,7 +358,7 @@ func (m *Module) fetchModuleVersions(ctx context.Context, dir, module string) (*
 	if strings.Count(original, "/") <= 2 || strings.Contains(original, "/cmd/") || strings.Contains(original, "/cli/") {
 		fmt.Printf("Path %q not found, searching for installable CLIs...\n", original)
 
-		discovered, found, err := m.DiscoverCLIPaths(ctx, original)
+		discovered, found, err := m.DiscoverCLIPaths(ctx, dir, original)
 		if err != nil || !found {
 			return nil, fmt.Errorf("failed to resolve module versions for %q (initially %q)", module, original)
 		}

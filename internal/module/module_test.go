@@ -11,7 +11,8 @@ func TestModule_Check(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := mod.FetchModuleInfo("https://github.com/spf13/afero.git"); err != nil {
+	// Use brdoc which has auto-discovery support
+	if err := mod.FetchModuleInfo("github.com/inovacc/brdoc"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -26,7 +27,8 @@ func TestModule_Check_Latest(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := mod.FetchModuleInfo("https://github.com/spf13/afero.git@latest"); err != nil {
+	// Use brdoc which has auto-discovery support
+	if err := mod.FetchModuleInfo("github.com/inovacc/brdoc@latest"); err != nil {
 		t.Fatal(err)
 	}
 

@@ -2,10 +2,16 @@ package module
 
 import (
 	"context"
+	"fmt"
+	"os"
 	"testing"
+
+	"github.com/inovacc/goinstall/pkg/exec"
 )
 
 func TestDiscoverFromCmdDir(t *testing.T) {
+	exec.SetCommandDebug(true)
+
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -28,6 +34,12 @@ func TestDiscoverFromCmdDir(t *testing.T) {
 			wantPaths:  []string{},
 			wantErr:    false,
 		},
+		{
+			name:       "module without cmd directory",
+			rootModule: "github.com/kubernetes/kubernetes",
+			wantPaths:  []string{},
+			wantErr:    false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -37,7 +49,21 @@ func TestDiscoverFromCmdDir(t *testing.T) {
 				t.Fatalf("NewModule() error = %v", err)
 			}
 
-			paths := m.discoverFromCmdDir(context.TODO(), tt.rootModule)
+			// Create temp directory
+			tmpDir, err := os.MkdirTemp("", "discovery-test")
+			if err != nil {
+				t.Fatalf("MkdirTemp() error = %v", err)
+			}
+			defer os.RemoveAll(tmpDir)
+
+			// Setup temp module and get the module for testing
+			ctx := context.TODO()
+			if err := m.setupTempModule(ctx, tmpDir); err != nil {
+				t.Fatalf("setupTempModule() error = %v", err)
+			}
+			_ = m.getModule(ctx, tmpDir, fmt.Sprintf("%s@latest", tt.rootModule))
+
+			paths := m.discoverFromCmdDir(ctx, tmpDir, tt.rootModule)
 
 			if len(paths) != len(tt.wantPaths) {
 				t.Errorf("discoverFromCmdDir() got %d paths, want %d", len(paths), len(tt.wantPaths))
@@ -86,7 +112,21 @@ func TestDiscoverFromCliDir(t *testing.T) {
 				t.Fatalf("NewModule() error = %v", err)
 			}
 
-			paths := m.discoverFromCliDir(context.TODO(), tt.rootModule)
+			// Create temp directory
+			tmpDir, err := os.MkdirTemp("", "discovery-test")
+			if err != nil {
+				t.Fatalf("MkdirTemp() error = %v", err)
+			}
+			defer os.RemoveAll(tmpDir)
+
+			// Setup temp module
+			ctx := context.TODO()
+			if err := m.setupTempModule(ctx, tmpDir); err != nil {
+				t.Fatalf("setupTempModule() error = %v", err)
+			}
+			_ = m.getModule(ctx, tmpDir, fmt.Sprintf("%s@latest", tt.rootModule))
+
+			paths := m.discoverFromCliDir(ctx, tmpDir, tt.rootModule)
 
 			if len(paths) != len(tt.wantPaths) {
 				t.Errorf("discoverFromCliDir() got %d paths, want %d", len(paths), len(tt.wantPaths))
@@ -124,7 +164,21 @@ func TestHasPackageMain(t *testing.T) {
 				t.Fatalf("NewModule() error = %v", err)
 			}
 
-			hasMain := m.hasPackageMain(context.TODO(), tt.path)
+			// Create temp directory
+			tmpDir, err := os.MkdirTemp("", "discovery-test")
+			if err != nil {
+				t.Fatalf("MkdirTemp() error = %v", err)
+			}
+			defer os.RemoveAll(tmpDir)
+
+			// Setup temp module
+			ctx := context.TODO()
+			if err := m.setupTempModule(ctx, tmpDir); err != nil {
+				t.Fatalf("setupTempModule() error = %v", err)
+			}
+			_ = m.getModule(ctx, tmpDir, fmt.Sprintf("%s@latest", tt.path))
+
+			hasMain := m.hasPackageMain(ctx, tmpDir, tt.path)
 
 			if hasMain != tt.wantMain {
 				t.Errorf("hasPackageMain() = %v, want %v", hasMain, tt.wantMain)
@@ -165,7 +219,25 @@ func TestDiscoverCLIPaths(t *testing.T) {
 				t.Fatalf("NewModule() error = %v", err)
 			}
 
-			paths, found, err := m.DiscoverCLIPaths(context.TODO(), tt.rootModule)
+			// Create temp directory for discovery
+			tmpDir, err := os.MkdirTemp("", "discovery-test")
+			if err != nil {
+				t.Fatalf("MkdirTemp() error = %v", err)
+			}
+			defer os.RemoveAll(tmpDir)
+
+			// Setup temp module
+			ctx := context.TODO()
+			if err := m.setupTempModule(ctx, tmpDir); err != nil {
+				t.Fatalf("setupTempModule() error = %v", err)
+			}
+
+			// Get module for discovery
+			if err := m.getModule(ctx, tmpDir, fmt.Sprintf("%s@latest", tt.rootModule)); err != nil {
+				t.Logf("getModule() error (may be expected): %v", err)
+			}
+
+			paths, found, err := m.DiscoverCLIPaths(ctx, tmpDir, tt.rootModule)
 			if err != nil {
 				t.Fatalf("DiscoverCLIPaths() error = %v", err)
 			}

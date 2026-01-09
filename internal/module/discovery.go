@@ -7,23 +7,24 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/inovacc/goinstall/pkg/exec"
 )
 
 // DiscoverCLIPaths attempts to find installable CLI paths when the root module fails
 // Returns: list of candidate paths, whether discovery was needed, error
-func (m *Module) DiscoverCLIPaths(ctx context.Context, rootModule string) ([]string, bool, error) {
+func (m *Module) DiscoverCLIPaths(ctx context.Context, dir, rootModule string) ([]string, bool, error) {
 	var candidates []string
 
 	// Method 1: Check for cmd/ directory
-	cmdPaths := m.discoverFromCmdDir(ctx, rootModule)
+	cmdPaths := m.discoverFromCmdDir(ctx, dir, rootModule)
 	candidates = append(candidates, cmdPaths...)
 
 	// Method 2: Check for cli/ directory
-	cliPaths := m.discoverFromCliDir(ctx, rootModule)
+	cliPaths := m.discoverFromCliDir(ctx, dir, rootModule)
 	candidates = append(candidates, cliPaths...)
 
 	// Method 3: Parse .goreleaser.yaml if exists
@@ -46,12 +47,12 @@ func (m *Module) DiscoverCLIPaths(ctx context.Context, rootModule string) ([]str
 }
 
 // discoverFromCmdDir checks for cmd/* subdirectories
-func (m *Module) discoverFromCmdDir(ctx context.Context, rootModule string) []string {
+func (m *Module) discoverFromCmdDir(ctx context.Context, dir, rootModule string) []string {
 	var paths []string
 
 	// Try: go list -json rootModule/cmd/...
-	cmd := exec.CommandContext(ctx, m.goBinPath, "list", "-json",
-		fmt.Sprintf("%s/cmd/...", rootModule))
+	cmd := exec.CommandContext(ctx, m.goBinPath, "list", "-json", fmt.Sprintf("%s/cmd/...", rootModule))
+	cmd.Dir = dir
 
 	var out bytes.Buffer
 
@@ -84,11 +85,11 @@ func (m *Module) discoverFromCmdDir(ctx context.Context, rootModule string) []st
 }
 
 // discoverFromCliDir checks for cli/* subdirectories
-func (m *Module) discoverFromCliDir(ctx context.Context, rootModule string) []string {
+func (m *Module) discoverFromCliDir(ctx context.Context, dir, rootModule string) []string {
 	var paths []string
 
-	cmd := exec.CommandContext(ctx, m.goBinPath, "list", "-json",
-		fmt.Sprintf("%s/cli/...", rootModule))
+	cmd := exec.CommandContext(ctx, m.goBinPath, "list", "-json", fmt.Sprintf("%s/cli/...", rootModule))
+	cmd.Dir = dir
 
 	var out bytes.Buffer
 
@@ -123,8 +124,7 @@ func (m *Module) discoverFromGoReleaser(ctx context.Context, rootModule string) 
 	var paths []string
 
 	// Use go list to get module cache location
-	cmd := exec.CommandContext(ctx, m.goBinPath, "list", "-m", "-json",
-		fmt.Sprintf("%s@latest", rootModule))
+	cmd := exec.CommandContext(ctx, m.goBinPath, "list", "-m", "-json", fmt.Sprintf("%s@latest", rootModule))
 
 	var out bytes.Buffer
 
@@ -179,8 +179,9 @@ func (m *Module) discoverFromGoReleaser(ctx context.Context, rootModule string) 
 }
 
 // hasPackageMain verifies a path contains package main
-func (m *Module) hasPackageMain(ctx context.Context, path string) bool {
+func (m *Module) hasPackageMain(ctx context.Context, dir, path string) bool {
 	cmd := exec.CommandContext(ctx, m.goBinPath, "list", "-json", path)
+	cmd.Dir = dir
 
 	var out bytes.Buffer
 

@@ -3,7 +3,8 @@ package module
 import (
 	"errors"
 	"fmt"
-	"os/exec"
+
+	"github.com/inovacc/goinstall/pkg/exec"
 )
 
 func validGoBinary(name string) error {
