@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/inovacc/glix/internal/config"
 	"github.com/inovacc/glix/internal/database"
 	pb "github.com/inovacc/glix/pkg/api/v1"
 	"github.com/inovacc/glix/pkg/exec"
@@ -64,11 +65,10 @@ func NewModule(ctx context.Context, goBinPath string) (*Module, error) {
 }
 
 func (m *Module) FetchModuleInfo(module string) error {
-	tmpDir, err := os.MkdirTemp("", "go-list")
+	tmpDir, err := config.GetApplicationCacheDirectory()
 	if err != nil {
 		return fmt.Errorf("failed to create temp dir: %w", err)
 	}
-
 	defer func() {
 		_ = os.RemoveAll(tmpDir)
 	}()

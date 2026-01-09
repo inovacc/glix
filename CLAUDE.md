@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-glix is a CLI wrapper around `go install` that adds SQLite-based tracking for installed Go modules, with planned features for monitoring updates and auto-updating modules.
+glix is a CLI wrapper around `go install` that adds BoltDB-based tracking for installed Go modules using Protocol Buffers, with features for installing, removing, and planned support for monitoring updates and auto-updating modules.
 
 ## Build and Development Commands
 
@@ -12,7 +12,8 @@ glix is a CLI wrapper around `go install` that adds SQLite-based tracking for in
 This project uses [Task](https://taskfile.dev/) for all build operations. Run `task` or `task --list` to see available commands.
 
 **Essential commands:**
-- `task generate` - Generate version info via genversioninfo (required before builds)
+- `task generate` - Generate version info and protobuf code (required before builds)
+- `task proto:generate` - Generate Protocol Buffer code from proto definitions
 - `task build:dev` - Build development snapshot with goreleaser
 - `task test` - Run tests with race detection and coverage
 - `task test:unit` - Run unit tests only (skip integration tests)
@@ -45,7 +46,10 @@ Version information is auto-generated using [genversioninfo](https://github.com/
 ### Core Components
 
 **Cobra CLI Structure** (`cmd/`)
-- `root.go` - Main command with install/update/remove flags, handles database path configuration
+- `root.go` - Main command with shorthand install support
+- `install.go` - Install command for modules
+- `remove.go` - Remove command for uninstalling modules
+- `update.go` - Update command (stub, not yet implemented)
 - `monitor.go` - Monitor installed modules for updates (in development)
 - `report.go` - Generate reports on installed modules (in development)
 - `version.go` - Auto-generated version command
@@ -58,10 +62,15 @@ Version information is auto-generated using [genversioninfo](https://github.com/
 - Dependency extraction: runs `go list -m all` in temp module to discover transitive dependencies
 
 **Database Layer** (`internal/database/`)
-- SQLite database via `modernc.org/sqlite` (pure Go, no CGO)
-- Schema: `modules` table (name, version, versions JSON, dependencies JSON, hash, time)
-- Schema: `dependencies` table (foreign key to modules, tracks individual dependencies)
+- BoltDB embedded key-value database via `go.etcd.io/bbolt` (pure Go, no CGO)
+- Protocol Buffer serialization via `google.golang.org/protobuf`
+- Bucket structure:
+  - `modules` - Stores ModuleProto with composite key (name@version)
+  - `dependencies` - Stores DependenciesProto keyed by module name
+  - `indexes_by_time` - Time-based secondary index for chronological queries
+  - `indexes_by_name` - Name-based secondary index for version lookups
 - Database location varies by OS (see Database Path section)
+- Comprehensive test coverage in `storage_test.go` (18 tests)
 
 **Installer** (`internal/installer/`)
 - Orchestrates the installation flow: create DB connection → fetch module info → install → record to database
@@ -69,11 +78,11 @@ Version information is auto-generated using [genversioninfo](https://github.com/
 
 ### Database Path Resolution
 
-Database location is platform-specific (see `cmd/root.go:dbPath()`):
+Database location is platform-specific (see `internal/config/config.go`):
 - **Windows**: `%LOCALAPPDATA%\glix\modules.db`
 - **macOS**: `~/Library/Application Support/glix/modules.db`
 - **Linux/Unix**: `$XDG_DATA_HOME/glix/modules.db` (defaults to `~/.local/share/glix/modules.db`)
-- **Override**: Set `GOINSTALL_DB_PATH` environment variable
+- **Override**: Set `GLIX_DB_PATH` environment variable
 
 ### Module Installation Flow
 
@@ -83,29 +92,35 @@ Database location is platform-specific (see `cmd/root.go:dbPath()`):
 4. Pick version (latest or user-specified via `@version` syntax)
 5. Run `go get module@version` in temp module to resolve dependencies
 6. Extract dependencies via `go list -m all`
-7. Execute `go install module@version` to user's `$GOPATH/bin`
-8. Record module + dependencies to SQLite database
-9. Clean up temporary directory
+7. Execute `go install module@version` to user's `$GOPATH/bin` (or use GoReleaser if `.goreleaser.yaml` exists)
+8. Convert module and dependencies to Protocol Buffer format
+9. Store in BoltDB with automatic index updates (time and name)
+10. Clean up temporary directory
 
 ### Key Dependencies
 
 - **Cobra** - CLI framework for commands and flags
-- **Viper** - Configuration management (currently used for DB path)
+- **BoltDB (bbolt)** - Embedded key-value database (`go.etcd.io/bbolt`)
+- **Protocol Buffers** - Binary serialization (`google.golang.org/protobuf`)
 - **afero** - Filesystem abstraction (enables in-memory testing)
-- **modernc.org/sqlite** - Pure Go SQLite driver (no CGO)
 - **golang.org/x/mod/semver** - Semantic version comparison
 
 ### Testing Strategy
 
 - Uses `afero.MemMapFs` for filesystem isolation in tests
 - Module tests use real `go` binary but operate in temp directories
-- Database tests use in-memory SQLite or temp file databases
+- Database tests use temporary BoltDB files with automatic cleanup
+- Storage layer has comprehensive test coverage (18 tests covering CRUD, indexes, concurrency)
 - Run `go test -short` to skip slow integration tests
+- Run `go test ./internal/database/` for database-specific tests
 
 ### Roadmap Status
 
 Per README.md:
-- [x] Install module - Implemented
+- [x] Install module - Implemented with smart CLI discovery and GoReleaser support
+- [x] Remove command - Implemented
+- [x] BoltDB migration - Complete with Protocol Buffers
+- [ ] Update command - Stub exists, not implemented
 - [ ] Report command - Stub exists, not implemented
 - [ ] Monitoring - Stub exists, not implemented
 - [ ] Auto update - Not started
@@ -117,7 +132,7 @@ Per README.md:
 - **golangci-lint** - Extensive linter configuration with many rules enabled/disabled in `.golangci.yml`
 
 ### Environment Variables
-- `GOINSTALL_DB_PATH` - Override default database location
+- `GLIX_DB_PATH` - Override default database location
 - `GITHUB_OWNER` - Used by Task/goreleaser (defaults to "dyammarcano")
 
 ## Common Gotchas

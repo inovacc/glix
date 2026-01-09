@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"hash/maphash"
 	"os"
 	"path/filepath"
 
@@ -12,7 +13,10 @@ const (
 	appName = "glix"
 )
 
-var appDir = ""
+var (
+	appDir   = ""
+	cacheDir = ""
+)
 
 func init() {
 	if appDir = os.Getenv("GLIX_DB_PATH"); appDir == "" {
@@ -20,15 +24,25 @@ func init() {
 		cobra.CheckErr(err)
 
 		appDir = filepath.Join(dataDir, appName)
+		cobra.CheckErr(os.MkdirAll(appDir, 0755))
+
+		cacheDir = filepath.Join(appDir, "cache")
+		cobra.CheckErr(os.MkdirAll(cacheDir, 0755))
 	}
 }
 
-func GetApplicationDirectory() (string, error) {
-	if err := os.MkdirAll(appDir, 0755); err != nil {
-		return "", fmt.Errorf("failed to create %s directory: %w", appName, err)
+func GetApplicationDirectory() string {
+	return appDir
+}
+
+func GetApplicationCacheDirectory() (string, error) {
+	randomDir := filepath.Join(cacheDir, fmt.Sprint(new(maphash.Hash).Sum64()))
+
+	if err := os.MkdirAll(randomDir, 0755); err != nil {
+		return "", err
 	}
 
-	return appDir, nil
+	return randomDir, nil
 }
 
 func GetDatabaseDirectory() string {
