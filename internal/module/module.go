@@ -21,15 +21,16 @@ import (
 const dummyModuleName = "dummy"
 
 type Module struct {
-	ctx          context.Context
-	goBinPath    string
-	timeout      time.Duration
-	Time         time.Time    `json:"time"`
-	Name         string       `json:"name"`
-	Hash         string       `json:"hash"`
-	Version      string       `json:"version"`
-	Versions     []string     `json:"versions"`
-	Dependencies []Dependency `json:"dependencies"`
+	ctx             context.Context
+	goBinPath       string
+	timeout         time.Duration
+	Time            time.Time    `json:"time"`
+	Name            string       `json:"name"`
+	Hash            string       `json:"hash"`
+	Version         string       `json:"version"`
+	Versions        []string     `json:"versions"`
+	Dependencies    []Dependency `json:"dependencies"`
+	discoveredPaths []string     // discovered CLI paths from smart detection
 }
 
 type Dependency struct {
@@ -244,12 +245,41 @@ func (m *Module) dependency(module string) (*Dependency, error) {
 	}, nil
 }
 
+// tryFetchVersions attempts a single version fetch for a specific module path
+func (m *Module) tryFetchVersions(ctx context.Context, dir, module string) (*ListResp, error) {
+	cmd := exec.CommandContext(ctx, m.goBinPath, "list", "-m", "-versions", "-json",
+		fmt.Sprintf("%s@latest", module))
+	cmd.Dir = dir
+
+	var lr ListResp
+	var out bytes.Buffer
+	cmd.Stdout = &out
+
+	if err := cmd.Run(); err != nil {
+		return nil, err
+	}
+
+	if err := json.NewDecoder(&out).Decode(&lr); err != nil {
+		return nil, err
+	}
+
+	if len(lr.Versions) > 0 {
+		sort.Slice(lr.Versions, func(i, j int) bool {
+			return semver.Compare(lr.Versions[i], lr.Versions[j]) > 0
+		})
+		return &lr, nil
+	}
+
+	return nil, fmt.Errorf("no versions found")
+}
+
 func (m *Module) fetchModuleVersions(ctx context.Context, dir, module string) (*ListResp, error) {
 	original := module
 	attempts := 0
 
 	const maxAttempts = 5
 
+	// PHASE 1: Try original path with backwards traversal
 	for {
 		cmd := exec.CommandContext(ctx, m.goBinPath, "list", "-m", "-versions", "-json", fmt.Sprintf("%s@latest", module))
 		cmd.Dir = dir
@@ -283,6 +313,24 @@ func (m *Module) fetchModuleVersions(ctx context.Context, dir, module string) (*
 
 		module = module[:lastSlash]
 		attempts++
+	}
+
+	// PHASE 2: Smart Detection - Discover CLI paths
+	fmt.Printf("Path %q not found, searching for installable CLIs...\n", original)
+
+	discovered, found, err := m.DiscoverCLIPaths(ctx, original)
+	if err != nil || !found {
+		return nil, fmt.Errorf("failed to resolve module versions for %q (initially %q)", module, original)
+	}
+
+	fmt.Printf("Found %d installable CLI(s)\n", len(discovered))
+
+	// Store discovered paths for later use
+	m.discoveredPaths = discovered
+
+	// Try first discovered path to get versions
+	if len(discovered) > 0 {
+		return m.tryFetchVersions(ctx, dir, discovered[0])
 	}
 
 	return nil, fmt.Errorf("failed to resolve module versions for %q (initially %q)", module, original)
@@ -400,4 +448,9 @@ func (m *Module) normalizeModulePath(input string) string {
 
 	// Final path cleanup
 	return strings.Trim(input, "/")
+}
+
+// GetDiscoveredPaths returns the list of discovered CLI paths from smart detection
+func (m *Module) GetDiscoveredPaths() []string {
+	return m.discoveredPaths
 }

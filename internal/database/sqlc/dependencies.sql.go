@@ -21,8 +21,7 @@ func (q *Queries) CountDependencies(ctx context.Context) (int64, error) {
 }
 
 const GetDependenciesByModule = `-- name: GetDependenciesByModule :many
-SELECT module_name, dep_name, dep_version, dep_hash FROM dependencies
-WHERE module_name = ?
+SELECT module_name, dep_name, dep_version, dep_hash FROM dependencies WHERE module_name = ?
 `
 
 func (q *Queries) GetDependenciesByModule(ctx context.Context, moduleName string) ([]Dependency, error) {
@@ -54,11 +53,8 @@ func (q *Queries) GetDependenciesByModule(ctx context.Context, moduleName string
 }
 
 const UpsertDependency = `-- name: UpsertDependency :exec
-INSERT INTO dependencies (module_name, dep_name, dep_version, dep_hash)
-VALUES (?, ?, ?, ?)
-ON CONFLICT(module_name, dep_name) DO UPDATE
-SET dep_version = excluded.dep_version,
-    dep_hash = excluded.dep_hash
+INSERT INTO dependencies (module_name, dep_name, dep_version, dep_hash) VALUES (?, ?, ?, ?)
+ON CONFLICT(module_name, dep_name) DO UPDATE SET dep_version = excluded.dep_version, dep_hash = excluded.dep_hash
 `
 
 type UpsertDependencyParams struct {

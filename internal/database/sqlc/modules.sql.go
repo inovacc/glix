@@ -22,8 +22,7 @@ func (q *Queries) CountModules(ctx context.Context) (int64, error) {
 }
 
 const DeleteModule = `-- name: DeleteModule :exec
-DELETE FROM modules
-WHERE name = ? AND version = ?
+DELETE FROM modules WHERE name = ? AND version = ?
 `
 
 type DeleteModuleParams struct {
@@ -37,9 +36,7 @@ func (q *Queries) DeleteModule(ctx context.Context, arg DeleteModuleParams) erro
 }
 
 const GetModule = `-- name: GetModule :one
-SELECT name, version, versions, dependencies, hash, time FROM modules
-WHERE name = ? AND version = ?
-LIMIT 1
+SELECT name, version, versions, dependencies, hash, time FROM modules WHERE name = ? AND version = ? LIMIT 1
 `
 
 type GetModuleParams struct {
@@ -62,9 +59,7 @@ func (q *Queries) GetModule(ctx context.Context, arg GetModuleParams) (Module, e
 }
 
 const GetModuleByName = `-- name: GetModuleByName :many
-SELECT name, version, versions, dependencies, hash, time FROM modules
-WHERE name = ?
-ORDER BY time DESC
+SELECT name, version, versions, dependencies, hash, time FROM modules WHERE name = ? ORDER BY time DESC
 `
 
 func (q *Queries) GetModuleByName(ctx context.Context, name string) ([]Module, error) {
@@ -98,8 +93,7 @@ func (q *Queries) GetModuleByName(ctx context.Context, name string) ([]Module, e
 }
 
 const ListModules = `-- name: ListModules :many
-SELECT name, version, versions, dependencies, hash, time FROM modules
-ORDER BY time DESC
+SELECT name, version, versions, dependencies, hash, time FROM modules ORDER BY time DESC
 `
 
 func (q *Queries) ListModules(ctx context.Context) ([]Module, error) {
@@ -133,13 +127,8 @@ func (q *Queries) ListModules(ctx context.Context) ([]Module, error) {
 }
 
 const UpsertModule = `-- name: UpsertModule :exec
-INSERT INTO modules (name, version, versions, dependencies, hash, time)
-VALUES (?, ?, ?, ?, ?, ?)
-ON CONFLICT(name, version) DO UPDATE
-SET hash = excluded.hash,
-    time = excluded.time,
-    versions = excluded.versions,
-    dependencies = excluded.dependencies
+INSERT INTO modules (name, version, versions, dependencies, hash, time) VALUES (?, ?, ?, ?, ?, ?)
+ON CONFLICT(name, version) DO UPDATE SET hash = excluded.hash, time = excluded.time, versions = excluded.versions, dependencies = excluded.dependencies
 `
 
 type UpsertModuleParams struct {
