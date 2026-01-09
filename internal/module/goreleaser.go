@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/inovacc/glix/internal/config"
 	"github.com/inovacc/glix/pkg/exec"
 )
 
@@ -154,17 +155,16 @@ func (m *Module) installViaGoReleaser(ctx context.Context, moduleDir string) err
 		return err
 	}
 
-	// Copy module to a temporary writable directory (module cache is read-only)
-	tmpDir, err := os.MkdirTemp("", "glix-build-*")
+	cacheDir, err := config.GetApplicationCacheDirectory()
 	if err != nil {
-		return fmt.Errorf("failed to create temp directory: %w", err)
+		return err
 	}
 
 	defer func() {
-		_ = os.RemoveAll(tmpDir)
+		_ = os.RemoveAll(cacheDir)
 	}()
 
-	buildDir := filepath.Join(tmpDir, "build")
+	buildDir := filepath.Join(cacheDir, "build")
 	if err := copyDir(moduleDir, buildDir); err != nil {
 		return fmt.Errorf("failed to copy module source: %w", err)
 	}

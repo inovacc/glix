@@ -14,15 +14,15 @@ import (
 
 // DiscoverCLIPaths attempts to find installable CLI paths when the root module fails
 // Returns: list of candidate paths, whether discovery was needed, error
-func (m *Module) DiscoverCLIPaths(ctx context.Context, dir, rootModule string) ([]string, bool, error) {
+func (m *Module) DiscoverCLIPaths(ctx context.Context, rootModule string) ([]string, bool, error) {
 	var candidates []string
 
 	// Method 1: Check for cmd/ directory
-	cmdPaths := m.discoverFromCmdDir(ctx, dir, rootModule)
+	cmdPaths := m.discoverFromCmdDir(ctx, m.workingDir, rootModule)
 	candidates = append(candidates, cmdPaths...)
 
 	// Method 2: Check for cli/ directory
-	cliPaths := m.discoverFromCliDir(ctx, dir, rootModule)
+	cliPaths := m.discoverFromCliDir(ctx, m.workingDir, rootModule)
 	candidates = append(candidates, cliPaths...)
 
 	// Method 3: Parse .goreleaser.yaml if exists
@@ -177,9 +177,9 @@ func (m *Module) discoverFromGoReleaser(ctx context.Context, rootModule string) 
 }
 
 // hasPackageMain verifies a path contains package main
-func (m *Module) hasPackageMain(ctx context.Context, dir, path string) bool {
+func (m *Module) hasPackageMain(ctx context.Context, path string) bool {
 	cmd := exec.CommandContext(ctx, m.goBinPath, "list", "-json", path)
-	cmd.Dir = dir
+	cmd.Dir = m.workingDir
 
 	var out bytes.Buffer
 

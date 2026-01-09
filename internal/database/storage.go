@@ -3,8 +3,6 @@ package database
 import (
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -25,31 +23,21 @@ var (
 
 // Storage wraps BoltDB with module tracking functionality
 type Storage struct {
-	db   *bolt.DB
-	path string
+	db *bolt.DB
 }
 
 // NewStorage initializes BoltDB connection and creates buckets
 func NewStorage(ctx context.Context) (*Storage, error) {
 	_ = ctx // Context is currently unused but kept for future use
 
-	dbPath := config.GetDatabaseDirectory()
-
-	// Ensure parent directory exists
-	dbDir := filepath.Dir(dbPath)
-	if err := os.MkdirAll(dbDir, 0755); err != nil {
-		return nil, fmt.Errorf("failed to create database directory: %w", err)
-	}
-
 	// Open BoltDB
-	db, err := bolt.Open(dbPath, 0600, &bolt.Options{Timeout: 1 * time.Second})
+	db, err := bolt.Open(config.GetDatabaseDirectory(), 0600, &bolt.Options{Timeout: 1 * time.Second})
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
 	storage := &Storage{
-		db:   db,
-		path: dbPath,
+		db: db,
 	}
 
 	// Initialize buckets

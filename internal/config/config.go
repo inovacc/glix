@@ -5,6 +5,7 @@ import (
 	"hash/maphash"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"github.com/spf13/cobra"
 )
@@ -16,6 +17,7 @@ const (
 var (
 	appDir   = ""
 	cacheDir = ""
+	once     sync.Once
 )
 
 func init() {
@@ -24,27 +26,33 @@ func init() {
 		cobra.CheckErr(err)
 
 		appDir = filepath.Join(dataDir, appName)
-		cobra.CheckErr(os.MkdirAll(appDir, 0755))
-
 		cacheDir = filepath.Join(appDir, "cache")
-		cobra.CheckErr(os.MkdirAll(cacheDir, 0755))
 	}
 }
 
 func GetApplicationDirectory() string {
+	once.Do(makeDirIfNotExists(appDir))
+
 	return appDir
 }
 
 func GetApplicationCacheDirectory() (string, error) {
-	randomDir := filepath.Join(cacheDir, fmt.Sprint(new(maphash.Hash).Sum64()))
+	once.Do(makeDirIfNotExists(cacheDir))
 
-	if err := os.MkdirAll(randomDir, 0755); err != nil {
-		return "", err
-	}
+	randomDir := filepath.Join(cacheDir, fmt.Sprint(new(maphash.Hash).Sum64()))
+	once.Do(makeDirIfNotExists(randomDir))
 
 	return randomDir, nil
 }
 
 func GetDatabaseDirectory() string {
 	return filepath.Join(appDir, fmt.Sprintf("%s.bolt", appName))
+}
+
+func makeDirIfNotExists(dir string) func() {
+	return func() {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			panic(err)
+		}
+	}
 }

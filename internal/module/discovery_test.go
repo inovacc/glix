@@ -45,25 +45,29 @@ func TestDiscoverFromCmdDir(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m, err := NewModule(context.TODO(), "go")
-			if err != nil {
-				t.Fatalf("NewModule() error = %v", err)
-			}
-
 			// Create temp directory
 			tmpDir, err := os.MkdirTemp("", "discovery-test")
 			if err != nil {
 				t.Fatalf("MkdirTemp() error = %v", err)
 			}
-			defer os.RemoveAll(tmpDir)
+			defer func(path string) {
+				if err := os.RemoveAll(path); err != nil {
+					t.Fatalf("RemoveAll() error = %v", err)
+				}
+			}(tmpDir)
+
+			m, err := NewModule(context.TODO(), "go", tmpDir)
+			if err != nil {
+				t.Fatalf("NewModule() error = %v", err)
+			}
 
 			// Setup temp module and get the module for testing
 			ctx := context.TODO()
-			if err := m.setupTempModule(ctx, tmpDir); err != nil {
+			if err := m.setupTempModule(ctx); err != nil {
 				t.Fatalf("setupTempModule() error = %v", err)
 			}
 
-			_ = m.getModule(ctx, tmpDir, fmt.Sprintf("%s@latest", tt.rootModule))
+			_ = m.getModule(ctx, fmt.Sprintf("%s@latest", tt.rootModule))
 
 			paths := m.discoverFromCmdDir(ctx, tmpDir, tt.rootModule)
 
@@ -102,25 +106,29 @@ func TestDiscoverFromCliDir(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m, err := NewModule(context.TODO(), "go")
-			if err != nil {
-				t.Fatalf("NewModule() error = %v", err)
-			}
-
 			// Create temp directory
 			tmpDir, err := os.MkdirTemp("", "discovery-test")
 			if err != nil {
 				t.Fatalf("MkdirTemp() error = %v", err)
 			}
-			defer os.RemoveAll(tmpDir)
+			defer func(path string) {
+				if err := os.RemoveAll(path); err != nil {
+					t.Fatalf("RemoveAll() error = %v", err)
+				}
+			}(tmpDir)
+
+			m, err := NewModule(context.TODO(), "go", tmpDir)
+			if err != nil {
+				t.Fatalf("NewModule() error = %v", err)
+			}
 
 			// Setup temp module
 			ctx := context.TODO()
-			if err := m.setupTempModule(ctx, tmpDir); err != nil {
+			if err := m.setupTempModule(ctx); err != nil {
 				t.Fatalf("setupTempModule() error = %v", err)
 			}
 
-			_ = m.getModule(ctx, tmpDir, fmt.Sprintf("%s@latest", tt.rootModule))
+			_ = m.getModule(ctx, fmt.Sprintf("%s@latest", tt.rootModule))
 
 			paths := m.discoverFromCliDir(ctx, tmpDir, tt.rootModule)
 
@@ -155,27 +163,31 @@ func TestHasPackageMain(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m, err := NewModule(context.TODO(), "go")
-			if err != nil {
-				t.Fatalf("NewModule() error = %v", err)
-			}
-
 			// Create temp directory
 			tmpDir, err := os.MkdirTemp("", "discovery-test")
 			if err != nil {
 				t.Fatalf("MkdirTemp() error = %v", err)
 			}
-			defer os.RemoveAll(tmpDir)
+			defer func(path string) {
+				if err := os.RemoveAll(path); err != nil {
+					t.Fatalf("RemoveAll() error = %v", err)
+				}
+			}(tmpDir)
+
+			m, err := NewModule(context.TODO(), "go", tmpDir)
+			if err != nil {
+				t.Fatalf("NewModule() error = %v", err)
+			}
 
 			// Setup temp module
 			ctx := context.TODO()
-			if err := m.setupTempModule(ctx, tmpDir); err != nil {
+			if err := m.setupTempModule(ctx); err != nil {
 				t.Fatalf("setupTempModule() error = %v", err)
 			}
 
-			_ = m.getModule(ctx, tmpDir, fmt.Sprintf("%s@latest", tt.path))
+			_ = m.getModule(ctx, fmt.Sprintf("%s@latest", tt.path))
 
-			hasMain := m.hasPackageMain(ctx, tmpDir, tt.path)
+			hasMain := m.hasPackageMain(ctx, tt.path)
 
 			if hasMain != tt.wantMain {
 				t.Errorf("hasPackageMain() = %v, want %v", hasMain, tt.wantMain)
@@ -211,30 +223,34 @@ func TestDiscoverCLIPaths(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m, err := NewModule(context.TODO(), "go")
-			if err != nil {
-				t.Fatalf("NewModule() error = %v", err)
-			}
-
 			// Create temp directory for discovery
 			tmpDir, err := os.MkdirTemp("", "discovery-test")
 			if err != nil {
 				t.Fatalf("MkdirTemp() error = %v", err)
 			}
-			defer os.RemoveAll(tmpDir)
+			defer func(path string) {
+				if err := os.RemoveAll(path); err != nil {
+					t.Fatalf("RemoveAll() error = %v", err)
+				}
+			}(tmpDir)
+
+			m, err := NewModule(context.TODO(), "go", tmpDir)
+			if err != nil {
+				t.Fatalf("NewModule() error = %v", err)
+			}
 
 			// Setup temp module
 			ctx := context.TODO()
-			if err := m.setupTempModule(ctx, tmpDir); err != nil {
+			if err := m.setupTempModule(ctx); err != nil {
 				t.Fatalf("setupTempModule() error = %v", err)
 			}
 
 			// Get module for discovery
-			if err := m.getModule(ctx, tmpDir, fmt.Sprintf("%s@latest", tt.rootModule)); err != nil {
+			if err := m.getModule(ctx, fmt.Sprintf("%s@latest", tt.rootModule)); err != nil {
 				t.Logf("getModule() error (may be expected): %v", err)
 			}
 
-			paths, found, err := m.DiscoverCLIPaths(ctx, tmpDir, tt.rootModule)
+			paths, found, err := m.DiscoverCLIPaths(ctx, tt.rootModule)
 			if err != nil {
 				t.Fatalf("DiscoverCLIPaths() error = %v", err)
 			}
@@ -258,7 +274,7 @@ func TestSmartDetection_BrdocExample(t *testing.T) {
 	// Test: glix github.com/inovacc/brdoc
 	// Should auto-discover: github.com/inovacc/brdoc/cmd/brdoc
 
-	m, err := NewModule(context.TODO(), "go")
+	m, err := NewModule(context.TODO(), "go", "")
 	if err != nil {
 		t.Fatalf("NewModule() error = %v", err)
 	}

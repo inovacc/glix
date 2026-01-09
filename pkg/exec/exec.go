@@ -14,7 +14,7 @@ func SetCommandDebug(v bool) {
 	debug = v
 }
 
-// Command
+// Command returns the [Cmd] struct to execute the named program with
 func Command(name string, arg ...string) *exec.Cmd {
 	if debug {
 		fmt.Printf("Executing: %s > Args: %v\n", name, arg)
@@ -23,7 +23,7 @@ func Command(name string, arg ...string) *exec.Cmd {
 	return exec.Command(name, arg...)
 }
 
-// CommandContext
+// CommandContext returns the [Cmd] struct to execute the named program with
 func CommandContext(ctx context.Context, name string, arg ...string) *exec.Cmd {
 	if debug {
 		fmt.Printf("Executing: %s > Args: %v\n", name, arg)

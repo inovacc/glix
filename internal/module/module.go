@@ -24,6 +24,7 @@ const dummyModuleName = "dummy"
 type Module struct {
 	ctx          context.Context
 	goBinPath    string
+	workingDir   string
 	timeout      time.Duration
 	Time         time.Time    `json:"time"`
 	Name         string       `json:"name"`
@@ -52,7 +53,7 @@ func (l *ListResp) EmptyVersions() bool {
 	return len(l.Versions) == 0
 }
 
-func NewModule(ctx context.Context, goBinPath string) (*Module, error) {
+func NewModule(ctx context.Context, goBinPath, workingDir string) (*Module, error) {
 	if err := validGoBinary(goBinPath); err != nil {
 		return nil, err
 	}
@@ -60,6 +61,7 @@ func NewModule(ctx context.Context, goBinPath string) (*Module, error) {
 	return &Module{
 		ctx:          ctx,
 		goBinPath:    goBinPath,
+		workingDir:   workingDir,
 		Dependencies: make([]Dependency, 0),
 	}, nil
 }
@@ -82,27 +84,27 @@ func (m *Module) FetchModuleInfo(module string) error {
 	m.Name = module
 
 	// Setup dummy mod early for discovery
-	if err := m.setupTempModule(ctx, tmpDir); err != nil {
+	if err := m.setupTempModule(ctx); err != nil {
 		return err
 	}
 
 	// Get versions from upstream
-	lr, err := m.fetchModuleVersions(ctx, tmpDir, module)
+	lr, err := m.fetchModuleVersions(ctx, module)
 	if err != nil {
 		return err
 	}
 
 	// Download the module first to check if it's installable
-	if err := m.getModule(ctx, tmpDir, fmt.Sprintf("%s@latest", module)); err != nil {
+	if err := m.getModule(ctx, fmt.Sprintf("%s@latest", module)); err != nil {
 		return fmt.Errorf("failed to download module: %w", err)
 	}
 
 	// Check if the resolved module is installable (has package main)
 	// If not, trigger smart detection to find CLI paths
-	if !m.hasPackageMain(ctx, tmpDir, module) {
+	if !m.hasPackageMain(ctx, module) {
 		fmt.Printf("Module %q found but is not installable (no main package), searching for CLIs...\n", module)
 
-		discovered, found, discErr := m.DiscoverCLIPaths(ctx, tmpDir, module)
+		discovered, found, discErr := m.DiscoverCLIPaths(ctx, module)
 		if discErr == nil && found && len(discovered) > 0 {
 			// Auto-select the first discovered CLI
 			selectedCLI := discovered[0]
@@ -132,13 +134,13 @@ func (m *Module) FetchModuleInfo(module string) error {
 	// Install target module in dummy with specific version if different from latest
 	// (we already downloaded @latest above for the installability check)
 	if version != "latest" && version != lr.Version {
-		if err := m.getModule(ctx, tmpDir, fmt.Sprintf("%s@%s", module, version)); err != nil {
+		if err := m.getModule(ctx, fmt.Sprintf("%s@%s", module, version)); err != nil {
 			return err
 		}
 	}
 
 	// Extract dependencies
-	m.Dependencies, err = m.extractDependencies(ctx, tmpDir, module)
+	m.Dependencies, err = m.extractDependencies(ctx, module)
 
 	return err
 }
@@ -299,7 +301,7 @@ func (m *Module) dependency(module string) (*Dependency, error) {
 
 	name, suffix := m.splitModuleVersion(module)
 
-	lr, err := m.fetchModuleVersions(ctx, tmpDir, name)
+	lr, err := m.fetchModuleVersions(ctx, name)
 	if err != nil {
 		return nil, err
 	}
@@ -315,10 +317,10 @@ func (m *Module) dependency(module string) (*Dependency, error) {
 }
 
 // tryFetchVersions attempts a single version fetch for a specific module path
-func (m *Module) tryFetchVersions(ctx context.Context, dir, module string) (*ListResp, error) {
+func (m *Module) tryFetchVersions(ctx context.Context, module string) (*ListResp, error) {
 	cmd := exec.CommandContext(ctx, m.goBinPath, "list", "-m", "-versions", "-json",
 		fmt.Sprintf("%s@latest", module))
-	cmd.Dir = dir
+	cmd.Dir = m.workingDir
 
 	var (
 		lr  ListResp
@@ -353,7 +355,7 @@ func (m *Module) tryFetchVersions(ctx context.Context, dir, module string) (*Lis
 	return nil, fmt.Errorf("no versions found")
 }
 
-func (m *Module) fetchModuleVersions(ctx context.Context, dir, module string) (*ListResp, error) {
+func (m *Module) fetchModuleVersions(ctx context.Context, module string) (*ListResp, error) {
 	original := module
 	attempts := 0
 
@@ -362,7 +364,7 @@ func (m *Module) fetchModuleVersions(ctx context.Context, dir, module string) (*
 	// PHASE 1: Try original path with backwards traversal
 	for {
 		cmd := exec.CommandContext(ctx, m.goBinPath, "list", "-m", "-versions", "-json", fmt.Sprintf("%s@latest", module))
-		cmd.Dir = dir
+		cmd.Dir = m.workingDir
 
 		var (
 			lr  ListResp
@@ -408,7 +410,7 @@ func (m *Module) fetchModuleVersions(ctx context.Context, dir, module string) (*
 	if strings.Count(original, "/") <= 2 || strings.Contains(original, "/cmd/") || strings.Contains(original, "/cli/") {
 		fmt.Printf("Path %q not found, searching for installable CLIs...\n", original)
 
-		discovered, found, err := m.DiscoverCLIPaths(ctx, dir, original)
+		discovered, found, err := m.DiscoverCLIPaths(ctx, original)
 		if err != nil || !found {
 			return nil, fmt.Errorf("failed to resolve module versions for %q (initially %q)", module, original)
 		}
@@ -421,30 +423,30 @@ func (m *Module) fetchModuleVersions(ctx context.Context, dir, module string) (*
 
 		// Try first discovered path to get versions
 		if len(discovered) > 0 {
-			return m.tryFetchVersions(ctx, dir, discovered[0])
+			return m.tryFetchVersions(ctx, discovered[0])
 		}
 	}
 
 	return nil, fmt.Errorf("failed to resolve module versions for %q (initially %q)", module, original)
 }
 
-func (m *Module) setupTempModule(ctx context.Context, dir string) error {
+func (m *Module) setupTempModule(ctx context.Context) error {
 	cmd := exec.CommandContext(ctx, m.goBinPath, "mod", "init", dummyModuleName)
-	cmd.Dir = dir
+	cmd.Dir = m.workingDir
 
 	return cmd.Run()
 }
 
-func (m *Module) getModule(ctx context.Context, dir, moduleWithVersion string) error {
+func (m *Module) getModule(ctx context.Context, moduleWithVersion string) error {
 	cmd := exec.CommandContext(ctx, m.goBinPath, "get", moduleWithVersion)
-	cmd.Dir = dir
+	cmd.Dir = m.workingDir
 
 	return cmd.Run()
 }
 
-func (m *Module) extractDependencies(ctx context.Context, dir, self string) ([]Dependency, error) {
+func (m *Module) extractDependencies(ctx context.Context, self string) ([]Dependency, error) {
 	cmd := exec.CommandContext(ctx, m.goBinPath, "list", "-m", "all")
-	cmd.Dir = dir
+	cmd.Dir = m.workingDir
 
 	out, err := cmd.Output()
 	if err != nil {
