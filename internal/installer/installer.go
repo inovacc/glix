@@ -13,11 +13,11 @@ import (
 )
 
 func Installer(cmd *cobra.Command, args []string) error {
-	db, err := database.NewDatabase(cmd.Context())
+	db, err := database.NewStorage(cmd.Context())
 	if err != nil {
 		return err
 	}
-	defer func(db *database.Database) {
+	defer func(db *database.Storage) {
 		cobra.CheckErr(db.Close())
 	}(db)
 
@@ -71,6 +71,7 @@ func Remover(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return fmt.Errorf("failed to get home directory: %w", err)
 		}
+
 		gopath = filepath.Join(home, "go")
 	}
 
@@ -95,15 +96,16 @@ func Remover(cmd *cobra.Command, args []string) error {
 		if err := os.Remove(binaryPath); err != nil {
 			return fmt.Errorf("failed to remove binary: %w", err)
 		}
+
 		cmd.Printf("Binary removed: %s\n", binaryPath)
 	}
 
 	// Remove from database
-	db, err := database.NewDatabase(cmd.Context())
+	db, err := database.NewStorage(cmd.Context())
 	if err != nil {
 		return err
 	}
-	defer func(db *database.Database) {
+	defer func(db *database.Storage) {
 		cobra.CheckErr(db.Close())
 	}(db)
 

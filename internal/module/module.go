@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/inovacc/glix/internal/database"
-	"github.com/inovacc/glix/internal/database/sqlc"
+	pb "github.com/inovacc/glix/pkg/api/v1"
 	"github.com/inovacc/glix/pkg/exec"
 	"golang.org/x/mod/semver"
 )
@@ -45,6 +45,10 @@ type ListResp struct {
 	Path     string    `json:"path"`
 	Version  string    `json:"version"`
 	Versions []string  `json:"versions,omitempty"`
+}
+
+func (l *ListResp) EmptyVersions() bool {
+	return len(l.Versions) == 0
 }
 
 func NewModule(ctx context.Context, goBinPath string) (*Module, error) {
@@ -216,66 +220,54 @@ func (m *Module) SaveToFile(path string) error {
 	return os.WriteFile(path, data, 0644)
 }
 
-func (m *Module) Report(db *database.Database) error {
-	// Serialize versions and dependencies to JSON
-	versionsJSON, err := json.Marshal(m.Versions)
-	if err != nil {
-		return fmt.Errorf("failed to marshal versions: %w", err)
+func (m *Module) Report(db *database.Storage) error {
+	// Convert Module struct to Protocol Buffer
+	moduleProto := &pb.ModuleProto{
+		Name:              m.Name,
+		Version:           m.Version,
+		Versions:          m.Versions,
+		Dependencies:      convertDependenciesToProto(m.Dependencies),
+		Hash:              m.Hash,
+		TimestampUnixNano: m.Time.UnixNano(),
 	}
 
-	depsJSON, err := json.Marshal(m.Dependencies)
-	if err != nil {
-		return fmt.Errorf("failed to marshal dependencies: %w", err)
+	// Upsert module
+	if err := db.UpsertModule(context.Background(), moduleProto); err != nil {
+		return fmt.Errorf("failed to upsert module: %w", err)
 	}
 
-	// Use transaction wrapper
-	return db.WithTx(context.Background(), func(q *sqlc.Queries) error {
-		// Upsert module with type-safe parameters
-		hashPtr := &m.Hash
-		if m.Hash == "" {
-			hashPtr = nil
+	// Upsert dependencies as a single entry
+	if len(m.Dependencies) > 0 {
+		depsProto := &pb.DependenciesProto{
+			Dependencies: moduleProto.GetDependencies(),
 		}
 
-		timePtr := &m.Time
-		if m.Time.IsZero() {
-			timePtr = nil
+		if err := db.UpsertDependencies(context.Background(), m.Name, depsProto); err != nil {
+			return fmt.Errorf("failed to upsert dependencies: %w", err)
 		}
+	}
 
-		if err := q.UpsertModule(context.Background(), sqlc.UpsertModuleParams{
-			Name:         m.Name,
-			Version:      m.Version,
-			Versions:     string(versionsJSON),
-			Dependencies: string(depsJSON),
-			Hash:         hashPtr,
-			Time:         timePtr,
-		}); err != nil {
-			return fmt.Errorf("failed to upsert module: %w", err)
-		}
+	return nil
+}
 
-		// Upsert dependencies
-		for _, d := range m.Dependencies {
-			depVersionPtr := &d.Version
-			if d.Version == "" {
-				depVersionPtr = nil
-			}
-
-			depHashPtr := &d.Hash
-			if d.Hash == "" {
-				depHashPtr = nil
-			}
-
-			if err := q.UpsertDependency(context.Background(), sqlc.UpsertDependencyParams{
-				ModuleName: m.Name,
-				DepName:    d.Name,
-				DepVersion: depVersionPtr,
-				DepHash:    depHashPtr,
-			}); err != nil {
-				return fmt.Errorf("failed to upsert dependency %s: %w", d.Name, err)
-			}
-		}
-
+// convertDependenciesToProto converts []Dependency to []*pb.DependencyProto
+func convertDependenciesToProto(deps []Dependency) []*pb.DependencyProto {
+	if len(deps) == 0 {
 		return nil
-	})
+	}
+
+	result := make([]*pb.DependencyProto, 0, len(deps))
+	for _, dep := range deps {
+		result = append(result, &pb.DependencyProto{
+			Name:         dep.Name,
+			Version:      dep.Version,
+			Versions:     dep.Versions,
+			Hash:         dep.Hash,
+			Dependencies: convertDependenciesToProto(dep.Dependencies),
+		})
+	}
+
+	return result
 }
 
 func LoadModuleFromFile(path string) (*Module, error) {
@@ -344,7 +336,7 @@ func (m *Module) tryFetchVersions(ctx context.Context, dir, module string) (*Lis
 	}
 
 	// For modules with tagged versions, sort them by semver
-	if len(lr.Versions) > 0 {
+	if !lr.EmptyVersions() {
 		sort.Slice(lr.Versions, func(i, j int) bool {
 			return semver.Compare(lr.Versions[i], lr.Versions[j]) > 0
 		})
@@ -385,7 +377,7 @@ func (m *Module) fetchModuleVersions(ctx context.Context, dir, module string) (*
 			}
 
 			// For modules with tagged versions
-			if len(lr.Versions) > 0 {
+			if !lr.EmptyVersions() {
 				sort.Slice(lr.Versions, func(i, j int) bool {
 					return semver.Compare(lr.Versions[i], lr.Versions[j]) > 0
 				})

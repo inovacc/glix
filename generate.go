@@ -3,9 +3,6 @@ package main
 //go:generate go get github.com/inovacc/genversioninfo
 //go:generate go run ./scripts/genversion/genversion.go
 
-//go:generate go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
-//go:generate sqlc generate
-
 //go:generate go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
 //go:generate go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 //go:generate go run ./scripts/proto/generate.go

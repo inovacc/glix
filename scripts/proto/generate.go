@@ -8,6 +8,14 @@ import (
 )
 
 func main() {
+	if err := checkProcInstalled(); err != nil {
+		_, _ = fmt.Fprintln(os.Stderr, "ERROR: protoc is not installed or not found in PATH")
+		_, _ = fmt.Fprintln(os.Stderr, "Please install protoc and ensure it's available in your system PATH.")
+		_, _ = fmt.Fprintln(os.Stderr, "Download from: https://github.com/protocolbuffers/protobuf/releases")
+
+		os.Exit(1)
+	}
+
 	protoDir := "proto/v1"
 	outDir := "pkg/api/v1"
 
@@ -56,4 +64,13 @@ func main() {
 
 	fmt.Println("")
 	fmt.Printf("Proto files generated successfully in %s\n", outDir)
+}
+
+func checkProcInstalled() error {
+	_, err := exec.LookPath("protoc")
+	if err != nil {
+		return fmt.Errorf("protoc not found in PATH")
+	}
+
+	return nil
 }

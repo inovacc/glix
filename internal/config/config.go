@@ -32,6 +32,5 @@ func GetApplicationDirectory() (string, error) {
 }
 
 func GetDatabaseDirectory() string {
-
-	return filepath.Join(appDir, "modules.db")
+	return filepath.Join(appDir, fmt.Sprintf("%s.bolt", appName))
 }
