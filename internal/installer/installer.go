@@ -7,8 +7,8 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/inovacc/goinstall/internal/database"
-	"github.com/inovacc/goinstall/internal/module"
+	"github.com/inovacc/glix/internal/database"
+	"github.com/inovacc/glix/internal/module"
 	"github.com/spf13/cobra"
 )
 

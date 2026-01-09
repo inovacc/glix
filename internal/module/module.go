@@ -12,9 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/inovacc/goinstall/internal/database"
-	"github.com/inovacc/goinstall/internal/database/sqlc"
-	"github.com/inovacc/goinstall/pkg/exec"
+	"github.com/inovacc/glix/internal/database"
+	"github.com/inovacc/glix/internal/database/sqlc"
+	"github.com/inovacc/glix/pkg/exec"
 	"golang.org/x/mod/semver"
 )
 

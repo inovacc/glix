@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/inovacc/goinstall/internal/database/sqlc"
+	"github.com/inovacc/glix/internal/database/sqlc"
 	"github.com/spf13/viper"
 )
 

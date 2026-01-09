@@ -7,7 +7,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/inovacc/goinstall/pkg/exec"
+	"github.com/inovacc/glix/pkg/exec"
 )
 
 func TestDiscoverFromCmdDir(t *testing.T) {
@@ -255,7 +255,7 @@ func TestSmartDetection_BrdocExample(t *testing.T) {
 		t.Skip("Skipping integration test in short mode")
 	}
 
-	// Test: goinstall github.com/inovacc/brdoc
+	// Test: glix github.com/inovacc/brdoc
 	// Should auto-discover: github.com/inovacc/brdoc/cmd/brdoc
 
 	m, err := NewModule(context.TODO(), "go")

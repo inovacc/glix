@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-goinstall is a CLI wrapper around `go install` that adds SQLite-based tracking for installed Go modules, with planned features for monitoring updates and auto-updating modules.
+glix is a CLI wrapper around `go install` that adds SQLite-based tracking for installed Go modules, with planned features for monitoring updates and auto-updating modules.
 
 ## Build and Development Commands
 
@@ -70,9 +70,9 @@ Version information is auto-generated using [genversioninfo](https://github.com/
 ### Database Path Resolution
 
 Database location is platform-specific (see `cmd/root.go:dbPath()`):
-- **Windows**: `%LOCALAPPDATA%\goinstall\modules.db`
-- **macOS**: `~/Library/Application Support/goinstall/modules.db`
-- **Linux/Unix**: `$XDG_DATA_HOME/goinstall/modules.db` (defaults to `~/.local/share/goinstall/modules.db`)
+- **Windows**: `%LOCALAPPDATA%\glix\modules.db`
+- **macOS**: `~/Library/Application Support/glix/modules.db`
+- **Linux/Unix**: `$XDG_DATA_HOME/glix/modules.db` (defaults to `~/.local/share/glix/modules.db`)
 - **Override**: Set `GOINSTALL_DB_PATH` environment variable
 
 ### Module Installation Flow

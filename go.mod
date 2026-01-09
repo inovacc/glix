@@ -1,4 +1,4 @@
-module github.com/inovacc/goinstall
+module github.com/inovacc/glix
 
 go 1.25
 

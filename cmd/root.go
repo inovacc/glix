@@ -2,19 +2,16 @@ package cmd
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
-	"runtime"
 
-	"github.com/inovacc/goinstall/internal/installer"
+	"github.com/inovacc/glix/internal/installer"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "goinstall",
+	Use:   "glix",
 	Short: "Install, update or remove Go modules with ease",
-	Long: `goinstall is a CLI tool that helps manage Go module installations.
+	Long: `glix is a CLI tool that helps manage Go module installations.
 
 You can use it to fetch, install, update, or remove Go packages
 from your environment with a clean and idiomatic approach.`,
@@ -58,28 +55,4 @@ func init() {
 
 	cobra.CheckErr(viper.BindPFlag("remove", rootCmd.Flags().Lookup("remove")))
 	cobra.CheckErr(viper.BindPFlag("update", rootCmd.Flags().Lookup("update")))
-
-	viper.Set("installPath", dbPath())
-}
-
-func dbPath() string {
-	if custom := os.Getenv("GOINSTALL_DB_PATH"); custom != "" {
-		return custom
-	}
-
-	home, _ := os.UserHomeDir()
-
-	switch runtime.GOOS {
-	case "windows":
-		return filepath.Join(home, "AppData", "Local", "goinstall", "modules.db")
-	case "darwin":
-		return filepath.Join(home, "Library", "Application Support", "goinstall", "modules.db")
-	default: // Linux/Unix with XDG
-		xdgData := os.Getenv("XDG_DATA_HOME")
-		if xdgData == "" {
-			xdgData = filepath.Join(home, ".local", "share")
-		}
-
-		return filepath.Join(xdgData, "goinstall", "modules.db")
-	}
 }

@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/inovacc/goinstall/pkg/exec"
+	"github.com/inovacc/glix/pkg/exec"
 )
 
 func validGoBinary(name string) error {

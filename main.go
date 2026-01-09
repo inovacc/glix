@@ -22,7 +22,7 @@ THE SOFTWARE.
 
 package main
 
-import "github.com/inovacc/goinstall/cmd"
+import "github.com/inovacc/glix/cmd"
 
 func main() {
 	cmd.Execute()

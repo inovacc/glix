@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/inovacc/goinstall/pkg/exec"
+	"github.com/inovacc/glix/pkg/exec"
 )
 
 // DiscoverCLIPaths attempts to find installable CLI paths when the root module fails

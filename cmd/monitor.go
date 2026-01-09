@@ -3,7 +3,7 @@ package cmd
 import (
 	"bytes"
 
-	"github.com/inovacc/goinstall/internal/monitor"
+	"github.com/inovacc/glix/internal/monitor"
 
 	"github.com/spf13/cobra"
 )

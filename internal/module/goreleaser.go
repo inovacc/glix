@@ -9,7 +9,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/inovacc/goinstall/pkg/exec"
+	"github.com/inovacc/glix/pkg/exec"
 )
 
 // hasGoReleaserConfig checks if the module has a .goreleaser.yaml or .goreleaser.yml file
@@ -155,7 +155,7 @@ func (m *Module) installViaGoReleaser(ctx context.Context, moduleDir string) err
 	}
 
 	// Copy module to a temporary writable directory (module cache is read-only)
-	tmpDir, err := os.MkdirTemp("", "goinstall-build-*")
+	tmpDir, err := os.MkdirTemp("", "glix-build-*")
 	if err != nil {
 		return fmt.Errorf("failed to create temp directory: %w", err)
 	}

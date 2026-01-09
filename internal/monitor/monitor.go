@@ -1,7 +1,7 @@
 package monitor
 
 import (
-	"github.com/inovacc/goinstall/internal/database"
+	"github.com/inovacc/glix/internal/database"
 	"github.com/spf13/cobra"
 )
 

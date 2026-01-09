@@ -1,4 +1,4 @@
-# Golang Installer [![Test](https://github.com/inovacc/goinstall/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/inovacc/goinstall/actions/workflows/test.yml)
+# Golang Installer [![Test](https://github.com/inovacc/glix/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/inovacc/glix/actions/workflows/test.yml)
 
 A smart wrapper around `go install` with SQLite-based module tracking, automatic CLI discovery, and GoReleaser build support.
 
@@ -14,7 +14,7 @@ A smart wrapper around `go install` with SQLite-based module tracking, automatic
 ## Installation
 
 ```shell
-go install github.com/inovacc/goinstall@latest
+go install github.com/inovacc/glix@latest
 ```
 
 ## Usage
@@ -25,42 +25,42 @@ Install a Go CLI tool by providing its module path:
 
 ```shell
 # Direct CLI path
-goinstall github.com/inovacc/ksuid/cmd/ksuid
+glix github.com/inovacc/ksuid/cmd/ksuid
 
 # With version pinning
-goinstall github.com/inovacc/ksuid/cmd/ksuid@v1.2.3
+glix github.com/inovacc/ksuid/cmd/ksuid@v1.2.3
 
 # Latest version (default)
-goinstall github.com/inovacc/ksuid/cmd/ksuid@latest
+glix github.com/inovacc/ksuid/cmd/ksuid@latest
 ```
 
 ### Flexible URL Formats
 
-`goinstall` accepts various URL formats and normalizes them automatically:
+`glix` accepts various URL formats and normalizes them automatically:
 
 ```shell
 # HTTPS URL
-goinstall https://github.com/inovacc/ksuid/cmd/ksuid
+glix https://github.com/inovacc/ksuid/cmd/ksuid
 
 # Git protocol
-goinstall git://github.com/inovacc/ksuid/cmd/ksuid
+glix git://github.com/inovacc/ksuid/cmd/ksuid
 
 # SSH format
-goinstall ssh://github.com/inovacc/ksuid/cmd/ksuid
+glix ssh://github.com/inovacc/ksuid/cmd/ksuid
 
 # With .git suffix
-goinstall https://github.com/inovacc/ksuid/cmd/ksuid.git
+glix https://github.com/inovacc/ksuid/cmd/ksuid.git
 ```
 
 All of these will be normalized to `github.com/inovacc/ksuid/cmd/ksuid`.
 
 ### Smart CLI Discovery
 
-When you provide a library module path (without a specific CLI path), `goinstall` automatically discovers installable CLIs:
+When you provide a library module path (without a specific CLI path), `glix` automatically discovers installable CLIs:
 
 ```shell
 # Provide root module - automatically discovers CLIs in cmd/ or cli/ directories
-goinstall github.com/inovacc/brdoc
+glix github.com/inovacc/brdoc
 
 # Output:
 # Module "github.com/inovacc/brdoc" found but is not installable (no main package), searching for CLIs...
@@ -77,7 +77,7 @@ If multiple CLIs are found, the first one is automatically selected.
 
 ### GoReleaser Build Support
 
-For modules with `.goreleaser.yaml` or `.goreleaser.yml` configurations, `goinstall` automatically:
+For modules with `.goreleaser.yaml` or `.goreleaser.yml` configurations, `glix` automatically:
 
 1. Detects the GoReleaser configuration
 2. Installs `goreleaser` if not present
@@ -87,7 +87,7 @@ For modules with `.goreleaser.yaml` or `.goreleaser.yml` configurations, `goinst
 
 ```shell
 # Module with .goreleaser.yaml - builds locally
-goinstall github.com/inovacc/twig
+glix github.com/inovacc/twig
 
 # Output:
 # Fetching module information...
@@ -107,14 +107,14 @@ This is particularly useful for:
 
 ### Version Support
 
-`goinstall` supports both tagged releases and pseudo-versions:
+`glix` supports both tagged releases and pseudo-versions:
 
 ```shell
 # Tagged release
-goinstall github.com/inovacc/brdoc@v1.0.0
+glix github.com/inovacc/brdoc@v1.0.0
 
 # Pseudo-version (for modules without tags)
-goinstall github.com/inovacc/twig@latest
+glix github.com/inovacc/twig@latest
 # Automatically uses: v0.0.0-20250109123456-abcdef123456
 ```
 
@@ -132,28 +132,28 @@ All installed modules are tracked in a SQLite database with:
 
 The database location varies by platform:
 
-- **Windows**: `%LOCALAPPDATA%\goinstall\modules.db`
-- **macOS**: `~/Library/Application Support/goinstall/modules.db`
-- **Linux**: `$XDG_DATA_HOME/goinstall/modules.db` (defaults to `~/.local/share/goinstall/modules.db`)
+- **Windows**: `%LOCALAPPDATA%\glix\modules.db`
+- **macOS**: `~/Library/Application Support/glix/modules.db`
+- **Linux**: `$XDG_DATA_HOME/glix/modules.db` (defaults to `~/.local/share/glix/modules.db`)
 
-Override with the `GOINSTALL_DB_PATH` environment variable:
+Override with the `GLIX_DB_PATH` environment variable:
 
 ```shell
-export GOINSTALL_DB_PATH=/custom/path/modules.db
-goinstall github.com/inovacc/ksuid/cmd/ksuid
+export GLIX_DB_PATH=/custom/path/modules.db
+glix github.com/inovacc/ksuid/cmd/ksuid
 ```
 
 ## Example Output
 
 ```shell
-$ goinstall github.com/inovacc/brdoc
+$ glix github.com/inovacc/brdoc
 
 Fetching module information...
 Module "github.com/inovacc/brdoc" found but is not installable (no main package), searching for CLIs...
 Found installable CLI: github.com/inovacc/brdoc/cmd/brdoc
 Installing module: github.com/inovacc/brdoc/cmd/brdoc
 Module is installer successfully: github.com/inovacc/brdoc/cmd/brdoc
-Show report using: goinstall report github.com/inovacc/brdoc/cmd/brdoc
+Show report using: glix report github.com/inovacc/brdoc/cmd/brdoc
 ```
 
 ## Commands
@@ -161,7 +161,7 @@ Show report using: goinstall report github.com/inovacc/brdoc/cmd/brdoc
 ### Install (default)
 
 ```shell
-goinstall <module-path>[@version]
+glix <module-path>[@version]
 ```
 
 Installs a Go module and tracks it in the database.
@@ -169,7 +169,7 @@ Installs a Go module and tracks it in the database.
 ### Report (planned)
 
 ```shell
-goinstall report <module-name>
+glix report <module-name>
 ```
 
 Generate reports on installed modules and their dependencies.
@@ -177,7 +177,7 @@ Generate reports on installed modules and their dependencies.
 ### Monitor (planned)
 
 ```shell
-goinstall monitor
+glix monitor
 ```
 
 Monitor installed modules for available updates.
