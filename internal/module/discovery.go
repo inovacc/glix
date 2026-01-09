@@ -32,7 +32,9 @@ func (m *Module) DiscoverCLIPaths(ctx context.Context, rootModule string) ([]str
 
 	// Remove duplicates
 	seen := make(map[string]bool)
+
 	var unique []string
+
 	for _, path := range candidates {
 		if !seen[path] {
 			seen[path] = true
@@ -52,6 +54,7 @@ func (m *Module) discoverFromCmdDir(ctx context.Context, rootModule string) []st
 		fmt.Sprintf("%s/cmd/...", rootModule))
 
 	var out bytes.Buffer
+
 	cmd.Stdout = &out
 
 	if err := cmd.Run(); err != nil {
@@ -60,6 +63,7 @@ func (m *Module) discoverFromCmdDir(ctx context.Context, rootModule string) []st
 
 	// Parse JSON output (one JSON object per line)
 	decoder := json.NewDecoder(&out)
+
 	for {
 		var pkg struct {
 			ImportPath string `json:"ImportPath"`
@@ -87,6 +91,7 @@ func (m *Module) discoverFromCliDir(ctx context.Context, rootModule string) []st
 		fmt.Sprintf("%s/cli/...", rootModule))
 
 	var out bytes.Buffer
+
 	cmd.Stdout = &out
 
 	if err := cmd.Run(); err != nil {
@@ -94,6 +99,7 @@ func (m *Module) discoverFromCliDir(ctx context.Context, rootModule string) []st
 	}
 
 	decoder := json.NewDecoder(&out)
+
 	for {
 		var pkg struct {
 			ImportPath string `json:"ImportPath"`
@@ -121,6 +127,7 @@ func (m *Module) discoverFromGoReleaser(ctx context.Context, rootModule string) 
 		fmt.Sprintf("%s@latest", rootModule))
 
 	var out bytes.Buffer
+
 	cmd.Stdout = &out
 
 	if err := cmd.Run(); err != nil {
@@ -137,10 +144,12 @@ func (m *Module) discoverFromGoReleaser(ctx context.Context, rootModule string) 
 
 	// Read .goreleaser.yaml from module directory
 	goreleaserPath := filepath.Join(modInfo.Dir, ".goreleaser.yaml")
+
 	data, err := os.ReadFile(goreleaserPath)
 	if err != nil {
 		// Try .goreleaser.yml
 		goreleaserPath = filepath.Join(modInfo.Dir, ".goreleaser.yml")
+
 		data, err = os.ReadFile(goreleaserPath)
 		if err != nil {
 			return paths // No goreleaser config
@@ -149,13 +158,13 @@ func (m *Module) discoverFromGoReleaser(ctx context.Context, rootModule string) 
 
 	// Simple YAML parsing for builds section
 	// Format: builds[].main or builds[].dir
-	lines := strings.Split(string(data), "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(string(data), "\n")
+	for line := range lines {
 		line = strings.TrimSpace(line)
 
 		// Look for main: ./cmd/toolname
-		if strings.HasPrefix(line, "main:") {
-			mainPath := strings.TrimSpace(strings.TrimPrefix(line, "main:"))
+		if after, ok := strings.CutPrefix(line, "main:"); ok {
+			mainPath := strings.TrimSpace(after)
 			mainPath = strings.Trim(mainPath, `"'`)
 			mainPath = strings.TrimPrefix(mainPath, "./")
 
@@ -174,6 +183,7 @@ func (m *Module) hasPackageMain(ctx context.Context, path string) bool {
 	cmd := exec.CommandContext(ctx, m.goBinPath, "list", "-json", path)
 
 	var out bytes.Buffer
+
 	cmd.Stdout = &out
 
 	if err := cmd.Run(); err != nil {
@@ -202,16 +212,19 @@ func PromptCLISelection(paths []string) ([]string, error) {
 	}
 
 	fmt.Println("\nMultiple installable CLIs found:")
+
 	for i, path := range paths {
 		// Extract CLI name from path (last segment)
 		parts := strings.Split(path, "/")
 		cliName := parts[len(parts)-1]
 		fmt.Printf("  [%d] %s (%s)\n", i+1, cliName, path)
 	}
+
 	fmt.Println("  [a] Install all")
 	fmt.Print("\nSelect CLI(s) to install (comma-separated numbers or 'a'): ")
 
 	var input string
+
 	_, _ = fmt.Scanln(&input)
 
 	if input == "a" || input == "A" {
@@ -220,12 +233,15 @@ func PromptCLISelection(paths []string) ([]string, error) {
 
 	// Parse comma-separated numbers
 	var selected []string
-	for _, numStr := range strings.Split(input, ",") {
+
+	for numStr := range strings.SplitSeq(input, ",") {
 		numStr = strings.TrimSpace(numStr)
+
 		num, err := strconv.Atoi(numStr)
 		if err != nil || num < 1 || num > len(paths) {
 			continue
 		}
+
 		selected = append(selected, paths[num-1])
 	}
 

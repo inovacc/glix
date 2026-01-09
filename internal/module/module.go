@@ -84,6 +84,38 @@ func (m *Module) FetchModuleInfo(module string) error {
 		return err
 	}
 
+	// Check if the resolved module is installable (has package main)
+	// If not, trigger smart detection to find CLI paths
+	if len(m.discoveredPaths) == 0 && !m.hasPackageMain(ctx, module) {
+		fmt.Printf("Module %q found but is not installable (no main package), searching for CLIs...\n", module)
+
+		discovered, found, discErr := m.DiscoverCLIPaths(ctx, module)
+		if discErr == nil && found && len(discovered) > 0 {
+			fmt.Printf("Found %d installable CLI(s)\n", len(discovered))
+			m.discoveredPaths = discovered
+
+			// If only one discovered, use it directly
+			if len(discovered) == 1 {
+				module = discovered[0]
+				m.Name = discovered[0]
+
+				// Re-fetch versions for the discovered path
+				lr, err = m.tryFetchVersions(ctx, tmpDir, discovered[0])
+				if err != nil {
+					return fmt.Errorf("failed to fetch versions for discovered path %q: %w", discovered[0], err)
+				}
+			}
+		} else {
+			return fmt.Errorf("module %q is not installable and no CLI paths were discovered", module)
+		}
+	}
+
+	// If discovery happened and found exactly one path, update the module name
+	if len(m.discoveredPaths) == 1 {
+		m.Name = m.discoveredPaths[0]
+		module = m.discoveredPaths[0]
+	}
+
 	if version == "latest" {
 		version = lr.Version
 	}
@@ -251,8 +283,11 @@ func (m *Module) tryFetchVersions(ctx context.Context, dir, module string) (*Lis
 		fmt.Sprintf("%s@latest", module))
 	cmd.Dir = dir
 
-	var lr ListResp
-	var out bytes.Buffer
+	var (
+		lr  ListResp
+		out bytes.Buffer
+	)
+
 	cmd.Stdout = &out
 
 	if err := cmd.Run(); err != nil {
@@ -267,6 +302,7 @@ func (m *Module) tryFetchVersions(ctx context.Context, dir, module string) (*Lis
 		sort.Slice(lr.Versions, func(i, j int) bool {
 			return semver.Compare(lr.Versions[i], lr.Versions[j]) > 0
 		})
+
 		return &lr, nil
 	}
 
@@ -316,21 +352,25 @@ func (m *Module) fetchModuleVersions(ctx context.Context, dir, module string) (*
 	}
 
 	// PHASE 2: Smart Detection - Discover CLI paths
-	fmt.Printf("Path %q not found, searching for installable CLIs...\n", original)
+	// Only trigger discovery for the original user input, not for dependencies
+	// Check if the original path looks like a root module (not a deep import path)
+	if strings.Count(original, "/") <= 2 || strings.Contains(original, "/cmd/") || strings.Contains(original, "/cli/") {
+		fmt.Printf("Path %q not found, searching for installable CLIs...\n", original)
 
-	discovered, found, err := m.DiscoverCLIPaths(ctx, original)
-	if err != nil || !found {
-		return nil, fmt.Errorf("failed to resolve module versions for %q (initially %q)", module, original)
-	}
+		discovered, found, err := m.DiscoverCLIPaths(ctx, original)
+		if err != nil || !found {
+			return nil, fmt.Errorf("failed to resolve module versions for %q (initially %q)", module, original)
+		}
 
-	fmt.Printf("Found %d installable CLI(s)\n", len(discovered))
+		fmt.Printf("Found %d installable CLI(s)\n", len(discovered))
 
-	// Store discovered paths for later use
-	m.discoveredPaths = discovered
+		// Store discovered paths for later use
+		m.discoveredPaths = discovered
 
-	// Try first discovered path to get versions
-	if len(discovered) > 0 {
-		return m.tryFetchVersions(ctx, dir, discovered[0])
+		// Try first discovered path to get versions
+		if len(discovered) > 0 {
+			return m.tryFetchVersions(ctx, dir, discovered[0])
+		}
 	}
 
 	return nil, fmt.Errorf("failed to resolve module versions for %q (initially %q)", module, original)

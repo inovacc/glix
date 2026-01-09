@@ -46,12 +46,14 @@ func TestDiscoverFromCmdDir(t *testing.T) {
 			// Check if expected paths are in the results
 			for _, wantPath := range tt.wantPaths {
 				found := false
+
 				for _, path := range paths {
 					if path == wantPath {
 						found = true
 						break
 					}
 				}
+
 				if !found {
 					t.Errorf("discoverFromCmdDir() missing expected path %s", wantPath)
 				}
@@ -204,6 +206,7 @@ func TestSmartDetection_BrdocExample(t *testing.T) {
 
 	expectedPath := "github.com/inovacc/brdoc/cmd/brdoc"
 	found := false
+
 	for _, path := range discovered {
 		if path == expectedPath {
 			found = true

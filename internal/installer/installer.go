@@ -43,6 +43,7 @@ func Installer(cmd *cobra.Command, args []string) error {
 				cmd.PrintErrf("Failed to install %s: %v\n", path, err)
 				continue
 			}
+
 			cmd.Printf("Successfully installed: %s\n", path)
 		}
 
@@ -51,6 +52,7 @@ func Installer(cmd *cobra.Command, args []string) error {
 
 	// Original single-CLI installation
 	cmd.Println("Installing module:", newModule.Name)
+
 	if err := newModule.InstallModule(cmd.Context()); err != nil {
 		return err
 	}
@@ -80,6 +82,7 @@ func installSingleCLI(cmd *cobra.Command, db *database.Database, path, version s
 
 	// Install
 	cmd.Println("Installing module:", tempModule.Name)
+
 	if err := tempModule.InstallModule(cmd.Context()); err != nil {
 		return err
 	}
