@@ -21,16 +21,15 @@ import (
 const dummyModuleName = "dummy"
 
 type Module struct {
-	ctx             context.Context
-	goBinPath       string
-	timeout         time.Duration
-	Time            time.Time    `json:"time"`
-	Name            string       `json:"name"`
-	Hash            string       `json:"hash"`
-	Version         string       `json:"version"`
-	Versions        []string     `json:"versions"`
-	Dependencies    []Dependency `json:"dependencies"`
-	discoveredPaths []string     // discovered CLI paths from smart detection
+	ctx          context.Context
+	goBinPath    string
+	timeout      time.Duration
+	Time         time.Time    `json:"time"`
+	Name         string       `json:"name"`
+	Hash         string       `json:"hash"`
+	Version      string       `json:"version"`
+	Versions     []string     `json:"versions"`
+	Dependencies []Dependency `json:"dependencies"`
 }
 
 type Dependency struct {
@@ -89,37 +88,32 @@ func (m *Module) FetchModuleInfo(module string) error {
 		return err
 	}
 
-	// Check if the resolved module is installable (has package main)
-	// If not, trigger smart detection to find CLI paths
-	if len(m.discoveredPaths) == 0 && !m.hasPackageMain(ctx, tmpDir, module) {
-		fmt.Printf("Module %q found but is not installable (no main package), searching for CLIs...\n", module)
-
-		// Add the module to temp go.mod before discovery
-		if err := m.getModule(ctx, tmpDir, fmt.Sprintf("%s@latest", module)); err == nil {
-			discovered, found, discErr := m.DiscoverCLIPaths(ctx, tmpDir, module)
-			if discErr == nil && found && len(discovered) > 0 {
-				fmt.Printf("Found %d installable CLI(s)\n", len(discovered))
-				m.discoveredPaths = discovered
-
-				// If only one discovered, use it directly
-				// Note: Don't re-fetch versions - the discovered path is a package within the module,
-				// so it uses the same versions as the root module
-				if len(discovered) == 1 {
-					module = discovered[0]
-					m.Name = discovered[0]
-				}
-			} else {
-				return fmt.Errorf("module %q is not installable and no CLI paths were discovered", module)
-			}
-		} else {
-			return fmt.Errorf("module %q is not installable and failed to download for discovery: %w", module, err)
-		}
+	// Download the module first to check if it's installable
+	if err := m.getModule(ctx, tmpDir, fmt.Sprintf("%s@latest", module)); err != nil {
+		return fmt.Errorf("failed to download module: %w", err)
 	}
 
-	// If discovery happened and found exactly one path, update the module name
-	if len(m.discoveredPaths) == 1 {
-		m.Name = m.discoveredPaths[0]
-		module = m.discoveredPaths[0]
+	// Check if the resolved module is installable (has package main)
+	// If not, trigger smart detection to find CLI paths
+	if !m.hasPackageMain(ctx, tmpDir, module) {
+		fmt.Printf("Module %q found but is not installable (no main package), searching for CLIs...\n", module)
+
+		discovered, found, discErr := m.DiscoverCLIPaths(ctx, tmpDir, module)
+		if discErr == nil && found && len(discovered) > 0 {
+			// Auto-select the first discovered CLI
+			selectedCLI := discovered[0]
+
+			if len(discovered) > 1 {
+				fmt.Printf("Found %d installable CLIs, auto-selecting: %s\n", len(discovered), selectedCLI)
+			} else {
+				fmt.Printf("Found installable CLI: %s\n", selectedCLI)
+			}
+
+			module = selectedCLI
+			m.Name = selectedCLI
+		} else {
+			return fmt.Errorf("module %q is not installable and no CLI paths were discovered", module)
+		}
 	}
 
 	if version == "latest" {
@@ -131,9 +125,12 @@ func (m *Module) FetchModuleInfo(module string) error {
 	m.Time = time.Now()
 	m.Hash = m.hashModule(fmt.Sprintf("%s@%s", module, version))
 
-	// Install target module in dummy (setupTempModule already called earlier)
-	if err := m.getModule(ctx, tmpDir, fmt.Sprintf("%s@%s", module, version)); err != nil {
-		return err
+	// Install target module in dummy with specific version if different from latest
+	// (we already downloaded @latest above for the installability check)
+	if version != "latest" && version != lr.Version {
+		if err := m.getModule(ctx, tmpDir, fmt.Sprintf("%s@%s", module, version)); err != nil {
+			return err
+		}
 	}
 
 	// Extract dependencies
@@ -299,11 +296,17 @@ func (m *Module) tryFetchVersions(ctx context.Context, dir, module string) (*Lis
 		return nil, err
 	}
 
+	// For modules with tagged versions, sort them by semver
 	if len(lr.Versions) > 0 {
 		sort.Slice(lr.Versions, func(i, j int) bool {
 			return semver.Compare(lr.Versions[i], lr.Versions[j]) > 0
 		})
+		return &lr, nil
+	}
 
+	// For modules without tags, use pseudo-version if available
+	if lr.Version != "" {
+		lr.Versions = []string{lr.Version}
 		return &lr, nil
 	}
 
@@ -333,11 +336,17 @@ func (m *Module) fetchModuleVersions(ctx context.Context, dir, module string) (*
 				return nil, fmt.Errorf("decoding list response failed: %w", err)
 			}
 
+			// For modules with tagged versions
 			if len(lr.Versions) > 0 {
 				sort.Slice(lr.Versions, func(i, j int) bool {
 					return semver.Compare(lr.Versions[i], lr.Versions[j]) > 0
 				})
+				return &lr, nil
+			}
 
+			// For modules without tags, use pseudo-version if available
+			if lr.Version != "" {
+				lr.Versions = []string{lr.Version}
 				return &lr, nil
 			}
 		}
@@ -363,10 +372,11 @@ func (m *Module) fetchModuleVersions(ctx context.Context, dir, module string) (*
 			return nil, fmt.Errorf("failed to resolve module versions for %q (initially %q)", module, original)
 		}
 
-		fmt.Printf("Found %d installable CLI(s)\n", len(discovered))
-
-		// Store discovered paths for later use
-		m.discoveredPaths = discovered
+		if len(discovered) > 1 {
+			fmt.Printf("Found %d installable CLIs, using first: %s\n", len(discovered), discovered[0])
+		} else {
+			fmt.Printf("Found installable CLI: %s\n", discovered[0])
+		}
 
 		// Try first discovered path to get versions
 		if len(discovered) > 0 {
@@ -489,9 +499,4 @@ func (m *Module) normalizeModulePath(input string) string {
 
 	// Final path cleanup
 	return strings.Trim(input, "/")
-}
-
-// GetDiscoveredPaths returns the list of discovered CLI paths from smart detection
-func (m *Module) GetDiscoveredPaths() []string {
-	return m.discoveredPaths
 }

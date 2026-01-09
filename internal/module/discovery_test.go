@@ -36,7 +36,7 @@ func TestDiscoverFromCmdDir(t *testing.T) {
 		},
 		{
 			name:       "module without cmd directory",
-			rootModule: "github.com/kubernetes/kubernetes",
+			rootModule: "github.com/goreleaser/goreleaser",
 			wantPaths:  []string{},
 			wantErr:    false,
 		},
@@ -271,64 +271,9 @@ func TestSmartDetection_BrdocExample(t *testing.T) {
 		t.Fatalf("FetchModuleInfo() error = %v", err)
 	}
 
-	discovered := m.GetDiscoveredPaths()
-	if len(discovered) == 0 {
-		t.Fatal("Expected to discover CLI paths")
-	}
-
+	// After discovery, the module name should be updated to the discovered CLI path
 	expectedPath := "github.com/inovacc/brdoc/cmd/brdoc"
-	found := false
-
-	for _, path := range discovered {
-		if path == expectedPath {
-			found = true
-			break
-		}
-	}
-
-	if !found {
-		t.Errorf("Expected to find %s in discovered paths, got: %v", expectedPath, discovered)
-	}
-}
-
-func TestPromptCLISelection(t *testing.T) {
-	tests := []struct {
-		name      string
-		paths     []string
-		wantErr   bool
-		wantPaths int
-	}{
-		{
-			name:      "empty paths",
-			paths:     []string{},
-			wantErr:   true,
-			wantPaths: 0,
-		},
-		{
-			name:      "single path - auto select",
-			paths:     []string{"github.com/user/repo/cmd/tool"},
-			wantErr:   false,
-			wantPaths: 1,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Skip the multiple paths test since it requires user input
-			if len(tt.paths) > 1 {
-				t.Skip("Skipping test that requires user input")
-			}
-
-			selected, err := PromptCLISelection(tt.paths)
-
-			if (err != nil) != tt.wantErr {
-				t.Errorf("PromptCLISelection() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-
-			if !tt.wantErr && len(selected) != tt.wantPaths {
-				t.Errorf("PromptCLISelection() got %d paths, want %d", len(selected), tt.wantPaths)
-			}
-		})
+	if m.Name != expectedPath {
+		t.Errorf("Expected module name to be %s, got %s", expectedPath, m.Name)
 	}
 }

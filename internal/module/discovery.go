@@ -4,11 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/inovacc/goinstall/pkg/exec"
@@ -200,55 +198,4 @@ func (m *Module) hasPackageMain(ctx context.Context, dir, path string) bool {
 	}
 
 	return pkg.Name == "main"
-}
-
-// PromptCLISelection asks user to choose CLI(s) from discovered paths
-func PromptCLISelection(paths []string) ([]string, error) {
-	if len(paths) == 0 {
-		return nil, errors.New("no CLI paths provided")
-	}
-
-	if len(paths) == 1 {
-		return paths, nil // Auto-select if only one
-	}
-
-	fmt.Println("\nMultiple installable CLIs found:")
-
-	for i, path := range paths {
-		// Extract CLI name from path (last segment)
-		parts := strings.Split(path, "/")
-		cliName := parts[len(parts)-1]
-		fmt.Printf("  [%d] %s (%s)\n", i+1, cliName, path)
-	}
-
-	fmt.Println("  [a] Install all")
-	fmt.Print("\nSelect CLI(s) to install (comma-separated numbers or 'a'): ")
-
-	var input string
-
-	_, _ = fmt.Scanln(&input)
-
-	if input == "a" || input == "A" {
-		return paths, nil
-	}
-
-	// Parse comma-separated numbers
-	var selected []string
-
-	for numStr := range strings.SplitSeq(input, ",") {
-		numStr = strings.TrimSpace(numStr)
-
-		num, err := strconv.Atoi(numStr)
-		if err != nil || num < 1 || num > len(paths) {
-			continue
-		}
-
-		selected = append(selected, paths[num-1])
-	}
-
-	if len(selected) == 0 {
-		return nil, errors.New("no valid selection")
-	}
-
-	return selected, nil
 }
