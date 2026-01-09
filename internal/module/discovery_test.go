@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"slices"
 	"testing"
 
 	"github.com/inovacc/goinstall/pkg/exec"
@@ -61,6 +62,7 @@ func TestDiscoverFromCmdDir(t *testing.T) {
 			if err := m.setupTempModule(ctx, tmpDir); err != nil {
 				t.Fatalf("setupTempModule() error = %v", err)
 			}
+
 			_ = m.getModule(ctx, tmpDir, fmt.Sprintf("%s@latest", tt.rootModule))
 
 			paths := m.discoverFromCmdDir(ctx, tmpDir, tt.rootModule)
@@ -71,14 +73,7 @@ func TestDiscoverFromCmdDir(t *testing.T) {
 
 			// Check if expected paths are in the results
 			for _, wantPath := range tt.wantPaths {
-				found := false
-
-				for _, path := range paths {
-					if path == wantPath {
-						found = true
-						break
-					}
-				}
+				found := slices.Contains(paths, wantPath)
 
 				if !found {
 					t.Errorf("discoverFromCmdDir() missing expected path %s", wantPath)
@@ -124,6 +119,7 @@ func TestDiscoverFromCliDir(t *testing.T) {
 			if err := m.setupTempModule(ctx, tmpDir); err != nil {
 				t.Fatalf("setupTempModule() error = %v", err)
 			}
+
 			_ = m.getModule(ctx, tmpDir, fmt.Sprintf("%s@latest", tt.rootModule))
 
 			paths := m.discoverFromCliDir(ctx, tmpDir, tt.rootModule)
@@ -176,6 +172,7 @@ func TestHasPackageMain(t *testing.T) {
 			if err := m.setupTempModule(ctx, tmpDir); err != nil {
 				t.Fatalf("setupTempModule() error = %v", err)
 			}
+
 			_ = m.getModule(ctx, tmpDir, fmt.Sprintf("%s@latest", tt.path))
 
 			hasMain := m.hasPackageMain(ctx, tmpDir, tt.path)

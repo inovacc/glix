@@ -140,6 +140,24 @@ func (m *Module) FetchModuleInfo(module string) error {
 }
 
 func (m *Module) InstallModule(ctx context.Context) error {
+	// Download the module to check for .goreleaser.yaml
+	moduleDir, err := m.getModuleSourceDir(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get module source: %w", err)
+	}
+
+	// Check if the module has a .goreleaser.yaml file
+	hasGR, configPath, err := m.hasGoReleaserConfig(ctx, moduleDir)
+	if err != nil {
+		return fmt.Errorf("failed to check for goreleaser config: %w", err)
+	}
+
+	if hasGR {
+		fmt.Printf("Found GoReleaser config: %s\n", filepath.Base(configPath))
+		return m.installViaGoReleaser(ctx, moduleDir)
+	}
+
+	// Standard go install
 	cmd := exec.CommandContext(ctx, m.goBinPath, "install", fmt.Sprintf("%s@%s", m.Name, m.Version))
 
 	gopath := os.Getenv("GOPATH")
@@ -154,6 +172,35 @@ func (m *Module) InstallModule(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// getModuleSourceDir downloads the module and returns its source directory
+func (m *Module) getModuleSourceDir(ctx context.Context) (string, error) {
+	// Use go mod download to get the module
+	cmd := exec.CommandContext(ctx, m.goBinPath, "mod", "download", "-json",
+		fmt.Sprintf("%s@%s", m.Name, m.Version))
+
+	var out bytes.Buffer
+
+	cmd.Stdout = &out
+
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("go mod download failed: %w", err)
+	}
+
+	var result struct {
+		Dir string `json:"Dir"`
+	}
+
+	if err := json.NewDecoder(&out).Decode(&result); err != nil {
+		return "", fmt.Errorf("failed to decode download result: %w", err)
+	}
+
+	if result.Dir == "" {
+		return "", fmt.Errorf("module directory not found in download result")
+	}
+
+	return result.Dir, nil
 }
 
 func (m *Module) ToJSON() ([]byte, error) {
@@ -301,6 +348,7 @@ func (m *Module) tryFetchVersions(ctx context.Context, dir, module string) (*Lis
 		sort.Slice(lr.Versions, func(i, j int) bool {
 			return semver.Compare(lr.Versions[i], lr.Versions[j]) > 0
 		})
+
 		return &lr, nil
 	}
 
@@ -341,6 +389,7 @@ func (m *Module) fetchModuleVersions(ctx context.Context, dir, module string) (*
 				sort.Slice(lr.Versions, func(i, j int) bool {
 					return semver.Compare(lr.Versions[i], lr.Versions[j]) > 0
 				})
+
 				return &lr, nil
 			}
 
