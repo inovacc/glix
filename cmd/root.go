@@ -28,9 +28,20 @@ from your environment with a clean and idiomatic approach.`,
 		}
 
 		if len(args) == 0 {
-			return fmt.Errorf("module name is required. Usage: goinstall [flags] <module>")
+			return cmd.Help()
 		}
 
+		// Handle remove flag
+		if remove {
+			return installer.Remover(cmd, args)
+		}
+
+		// Handle update flag (not yet implemented)
+		if update {
+			return fmt.Errorf("update functionality not yet implemented")
+		}
+
+		// Default: install
 		return installer.Installer(cmd, args)
 	},
 }
