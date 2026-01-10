@@ -1,13 +1,11 @@
 package database
 
 import (
-	"context"
 	"fmt"
 	"sort"
 	"strings"
 	"time"
 
-	"github.com/inovacc/glix/internal/config"
 	pb "github.com/inovacc/glix/pkg/api/v1"
 	bolt "go.etcd.io/bbolt"
 	"google.golang.org/protobuf/proto"
@@ -27,11 +25,9 @@ type Storage struct {
 }
 
 // NewStorage initializes BoltDB connection and creates buckets
-func NewStorage(ctx context.Context) (*Storage, error) {
-	_ = ctx // Context is currently unused but kept for future use
-
+func NewStorage(dbPath string) (*Storage, error) {
 	// Open BoltDB
-	db, err := bolt.Open(config.GetDatabaseDirectory(), 0600, &bolt.Options{Timeout: 1 * time.Second})
+	db, err := bolt.Open(dbPath, 0600, &bolt.Options{Timeout: 1 * time.Second})
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
@@ -74,10 +70,19 @@ func (s *Storage) initBuckets() error {
 	})
 }
 
-// UpsertModule inserts or updates a module
-func (s *Storage) UpsertModule(ctx context.Context, module *pb.ModuleProto) error {
-	_ = ctx // Context is currently unused but kept for future use
+// UpsertModules inserts or updates a module
+func (s *Storage) UpsertModules(module []*pb.ModuleProto) error {
+	for _, mod := range module {
+		if err := s.UpsertModule(mod); err != nil {
+			return err
+		}
+	}
 
+	return nil
+}
+
+// UpsertModule inserts or updates a module
+func (s *Storage) UpsertModule(module *pb.ModuleProto) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
 		// Serialize module to protobuf
 		data, err := proto.Marshal(module)
@@ -109,9 +114,7 @@ func (s *Storage) UpsertModule(ctx context.Context, module *pb.ModuleProto) erro
 }
 
 // GetModule retrieves a module by name and version
-func (s *Storage) GetModule(ctx context.Context, name, version string) (*pb.ModuleProto, error) {
-	_ = ctx // Context is currently unused but kept for future use
-
+func (s *Storage) GetModule(name, version string) (*pb.ModuleProto, error) {
 	var module *pb.ModuleProto
 
 	err := s.db.View(func(tx *bolt.Tx) error {
@@ -135,9 +138,7 @@ func (s *Storage) GetModule(ctx context.Context, name, version string) (*pb.Modu
 }
 
 // GetModuleByName retrieves all versions of a module by name
-func (s *Storage) GetModuleByName(ctx context.Context, name string) ([]*pb.ModuleProto, error) {
-	_ = ctx // Context is currently unused but kept for future use
-
+func (s *Storage) GetModuleByName(name string) ([]*pb.ModuleProto, error) {
 	var modules []*pb.ModuleProto
 
 	err := s.db.View(func(tx *bolt.Tx) error {
@@ -167,7 +168,7 @@ func (s *Storage) GetModuleByName(ctx context.Context, name string) ([]*pb.Modul
 }
 
 // ListModules retrieves all modules ordered by time (most recent first)
-func (s *Storage) ListModules(ctx context.Context) ([]*pb.ModuleProto, error) {
+func (s *Storage) ListModules() ([]*pb.ModuleProto, error) {
 	var modules []*pb.ModuleProto
 
 	err := s.db.View(func(tx *bolt.Tx) error {
@@ -200,7 +201,7 @@ func (s *Storage) ListModules(ctx context.Context) ([]*pb.ModuleProto, error) {
 }
 
 // DeleteModule removes a module and updates indexes
-func (s *Storage) DeleteModule(ctx context.Context, name, version string) error {
+func (s *Storage) DeleteModule(name, version string) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
 		key := []byte(fmt.Sprintf("%s@%s", name, version))
 
@@ -245,7 +246,7 @@ func (s *Storage) DeleteModule(ctx context.Context, name, version string) error 
 }
 
 // CountModules returns the total number of modules
-func (s *Storage) CountModules(ctx context.Context) (int64, error) {
+func (s *Storage) CountModules() (int64, error) {
 	var count int64
 
 	err := s.db.View(func(tx *bolt.Tx) error {
@@ -260,7 +261,7 @@ func (s *Storage) CountModules(ctx context.Context) (int64, error) {
 }
 
 // UpsertDependencies stores dependencies for a module
-func (s *Storage) UpsertDependencies(ctx context.Context, moduleName string, deps *pb.DependenciesProto) error {
+func (s *Storage) UpsertDependencies(moduleName string, deps *pb.DependenciesProto) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
 		data, err := proto.Marshal(deps)
 		if err != nil {
@@ -279,7 +280,7 @@ func (s *Storage) UpsertDependencies(ctx context.Context, moduleName string, dep
 }
 
 // GetDependenciesByModule retrieves dependencies for a module
-func (s *Storage) GetDependenciesByModule(ctx context.Context, moduleName string) (*pb.DependenciesProto, error) {
+func (s *Storage) GetDependenciesByModule(moduleName string) (*pb.DependenciesProto, error) {
 	var deps *pb.DependenciesProto
 
 	err := s.db.View(func(tx *bolt.Tx) error {
@@ -303,7 +304,7 @@ func (s *Storage) GetDependenciesByModule(ctx context.Context, moduleName string
 }
 
 // CountDependencies returns the total number of dependency entries
-func (s *Storage) CountDependencies(ctx context.Context) (int64, error) {
+func (s *Storage) CountDependencies() (int64, error) {
 	var count int64
 
 	err := s.db.View(func(tx *bolt.Tx) error {

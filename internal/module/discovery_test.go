@@ -2,7 +2,6 @@ package module
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"slices"
 	"testing"
@@ -67,7 +66,10 @@ func TestDiscoverFromCmdDir(t *testing.T) {
 				t.Fatalf("setupTempModule() error = %v", err)
 			}
 
-			_ = m.getModule(ctx, fmt.Sprintf("%s@latest", tt.rootModule))
+			// Get module for discovery
+			if err := m.getLatestModule(ctx, tt.rootModule); err != nil {
+				t.Logf("getModule() error (may be expected): %v", err)
+			}
 
 			paths := m.discoverFromCmdDir(ctx, tmpDir, tt.rootModule)
 
@@ -128,7 +130,10 @@ func TestDiscoverFromCliDir(t *testing.T) {
 				t.Fatalf("setupTempModule() error = %v", err)
 			}
 
-			_ = m.getModule(ctx, fmt.Sprintf("%s@latest", tt.rootModule))
+			// Get module for discovery
+			if err := m.getLatestModule(ctx, tt.rootModule); err != nil {
+				t.Logf("getModule() error (may be expected): %v", err)
+			}
 
 			paths := m.discoverFromCliDir(ctx, tmpDir, tt.rootModule)
 
@@ -185,7 +190,10 @@ func TestHasPackageMain(t *testing.T) {
 				t.Fatalf("setupTempModule() error = %v", err)
 			}
 
-			_ = m.getModule(ctx, fmt.Sprintf("%s@latest", tt.path))
+			// Get module for discovery
+			if err := m.getLatestModule(ctx, tt.path); err != nil {
+				t.Logf("getModule() error (may be expected): %v", err)
+			}
 
 			hasMain := m.hasPackageMain(ctx, tt.path)
 
@@ -246,7 +254,7 @@ func TestDiscoverCLIPaths(t *testing.T) {
 			}
 
 			// Get module for discovery
-			if err := m.getModule(ctx, fmt.Sprintf("%s@latest", tt.rootModule)); err != nil {
+			if err := m.getLatestModule(ctx, tt.rootModule); err != nil {
 				t.Logf("getModule() error (may be expected): %v", err)
 			}
 

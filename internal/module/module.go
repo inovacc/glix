@@ -12,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/inovacc/glix/internal/config"
 	"github.com/inovacc/glix/internal/database"
 	pb "github.com/inovacc/glix/pkg/api/v1"
 	"github.com/inovacc/glix/pkg/exec"
@@ -22,16 +21,17 @@ import (
 const dummyModuleName = "dummy"
 
 type Module struct {
-	ctx          context.Context
-	goBinPath    string
-	workingDir   string
-	timeout      time.Duration
-	Time         time.Time    `json:"time"`
-	Name         string       `json:"name"`
-	Hash         string       `json:"hash"`
-	Version      string       `json:"version"`
-	Versions     []string     `json:"versions"`
-	Dependencies []Dependency `json:"dependencies"`
+	ctx           context.Context
+	goBinPath     string
+	workingDir    string
+	timeout       time.Duration
+	goListPackage []GoListPackage
+	Time          time.Time    `json:"time"`
+	Name          string       `json:"name"`
+	Hash          string       `json:"hash"`
+	Version       string       `json:"version"`
+	Versions      []string     `json:"versions"`
+	Dependencies  []Dependency `json:"dependencies"`
 }
 
 type Dependency struct {
@@ -59,22 +59,15 @@ func NewModule(ctx context.Context, goBinPath, workingDir string) (*Module, erro
 	}
 
 	return &Module{
-		ctx:          ctx,
-		goBinPath:    goBinPath,
-		workingDir:   workingDir,
-		Dependencies: make([]Dependency, 0),
+		ctx:           ctx,
+		goBinPath:     goBinPath,
+		workingDir:    workingDir,
+		goListPackage: make([]GoListPackage, 0),
+		Dependencies:  make([]Dependency, 0),
 	}, nil
 }
 
 func (m *Module) FetchModuleInfo(module string) error {
-	tmpDir, err := config.GetApplicationCacheDirectory()
-	if err != nil {
-		return fmt.Errorf("failed to create temp dir: %w", err)
-	}
-	defer func() {
-		_ = os.RemoveAll(tmpDir)
-	}()
-
 	module = m.normalizeModulePath(module)
 
 	ctx, cancel := context.WithTimeout(m.ctx, m.getTimeout())
@@ -183,8 +176,7 @@ func (m *Module) InstallModule(ctx context.Context) error {
 // getModuleSourceDir downloads the module and returns its source directory
 func (m *Module) getModuleSourceDir(ctx context.Context) (string, error) {
 	// Use go mod download to get the module
-	cmd := exec.CommandContext(ctx, m.goBinPath, "mod", "download", "-json",
-		fmt.Sprintf("%s@%s", m.Name, m.Version))
+	cmd := exec.CommandContext(ctx, m.goBinPath, "mod", "download", "-json", fmt.Sprintf("%s@%s", m.Name, m.Version))
 
 	var out bytes.Buffer
 
@@ -234,7 +226,7 @@ func (m *Module) Report(db *database.Storage) error {
 	}
 
 	// Upsert module
-	if err := db.UpsertModule(context.Background(), moduleProto); err != nil {
+	if err := db.UpsertModule(moduleProto); err != nil {
 		return fmt.Errorf("failed to upsert module: %w", err)
 	}
 
@@ -244,7 +236,7 @@ func (m *Module) Report(db *database.Storage) error {
 			Dependencies: moduleProto.GetDependencies(),
 		}
 
-		if err := db.UpsertDependencies(context.Background(), m.Name, depsProto); err != nil {
+		if err := db.UpsertDependencies(m.Name, depsProto); err != nil {
 			return fmt.Errorf("failed to upsert dependencies: %w", err)
 		}
 	}
@@ -318,8 +310,7 @@ func (m *Module) dependency(module string) (*Dependency, error) {
 
 // tryFetchVersions attempts a single version fetch for a specific module path
 func (m *Module) tryFetchVersions(ctx context.Context, module string) (*ListResp, error) {
-	cmd := exec.CommandContext(ctx, m.goBinPath, "list", "-m", "-versions", "-json",
-		fmt.Sprintf("%s@latest", module))
+	cmd := exec.CommandContext(ctx, m.goBinPath, "list", "-m", "-versions", "-json", fmt.Sprintf("%s@latest", module))
 	cmd.Dir = m.workingDir
 
 	var (
@@ -439,6 +430,13 @@ func (m *Module) setupTempModule(ctx context.Context) error {
 
 func (m *Module) getModule(ctx context.Context, moduleWithVersion string) error {
 	cmd := exec.CommandContext(ctx, m.goBinPath, "get", moduleWithVersion)
+	cmd.Dir = m.workingDir
+
+	return cmd.Run()
+}
+
+func (m *Module) getLatestModule(ctx context.Context, moduleName string) error {
+	cmd := exec.CommandContext(ctx, m.goBinPath, "get", fmt.Sprintf("%s@latest", moduleName))
 	cmd.Dir = m.workingDir
 
 	return cmd.Run()

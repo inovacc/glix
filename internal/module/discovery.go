@@ -64,14 +64,13 @@ func (m *Module) discoverFromCmdDir(ctx context.Context, dir, rootModule string)
 	decoder := json.NewDecoder(&out)
 
 	for {
-		var pkg struct {
-			ImportPath string `json:"ImportPath"`
-			Name       string `json:"Name"`
-		}
+		pkg := GoListPackage{}
 
 		if err := decoder.Decode(&pkg); err != nil {
 			break
 		}
+
+		m.goListPackage = append(m.goListPackage, pkg)
 
 		// Only include if it's a command (has package main)
 		if pkg.Name == "main" {
@@ -100,14 +99,13 @@ func (m *Module) discoverFromCliDir(ctx context.Context, dir, rootModule string)
 	decoder := json.NewDecoder(&out)
 
 	for {
-		var pkg struct {
-			ImportPath string `json:"ImportPath"`
-			Name       string `json:"Name"`
-		}
+		pkg := GoListPackage{}
 
 		if err := decoder.Decode(&pkg); err != nil {
 			break
 		}
+
+		m.goListPackage = append(m.goListPackage, pkg)
 
 		if pkg.Name == "main" {
 			paths = append(paths, pkg.ImportPath)
@@ -189,9 +187,7 @@ func (m *Module) hasPackageMain(ctx context.Context, path string) bool {
 		return false
 	}
 
-	var pkg struct {
-		Name string `json:"Name"`
-	}
+	pkg := GoListPackage{}
 
 	if err := json.NewDecoder(&out).Decode(&pkg); err != nil {
 		return false

@@ -9,7 +9,6 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/inovacc/glix/internal/config"
 	"github.com/inovacc/glix/pkg/exec"
 )
 
@@ -155,7 +154,7 @@ func (m *Module) installViaGoReleaser(ctx context.Context, moduleDir string) err
 		return err
 	}
 
-	cacheDir, err := config.GetApplicationCacheDirectory()
+	cacheDir, err := GetApplicationCacheDirectory()
 	if err != nil {
 		return err
 	}

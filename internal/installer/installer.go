@@ -7,14 +7,13 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/inovacc/glix/internal/config"
 	"github.com/inovacc/glix/internal/database"
 	"github.com/inovacc/glix/internal/module"
 	"github.com/spf13/cobra"
 )
 
 func Installer(cmd *cobra.Command, args []string) error {
-	db, err := database.NewStorage(cmd.Context())
+	db, err := database.NewStorage(cmd.Context(), module.GetDatabaseDirectory())
 	if err != nil {
 		return err
 	}
@@ -22,7 +21,7 @@ func Installer(cmd *cobra.Command, args []string) error {
 		cobra.CheckErr(db.Close())
 	}(db)
 
-	cacheDir, err := config.GetApplicationCacheDirectory()
+	cacheDir, err := module.GetApplicationCacheDirectory()
 	if err != nil {
 		return err
 	}
@@ -57,7 +56,7 @@ func Installer(cmd *cobra.Command, args []string) error {
 }
 
 func Remover(cmd *cobra.Command, args []string) error {
-	cacheDir, err := config.GetApplicationCacheDirectory()
+	cacheDir, err := module.GetApplicationCacheDirectory()
 	if err != nil {
 		return err
 	}
@@ -112,7 +111,7 @@ func Remover(cmd *cobra.Command, args []string) error {
 	}
 
 	// Remove from database
-	db, err := database.NewStorage(cmd.Context())
+	db, err := database.NewStorage(cmd.Context(), module.GetDatabaseDirectory())
 	if err != nil {
 		return err
 	}

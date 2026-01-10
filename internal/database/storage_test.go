@@ -31,8 +31,7 @@ func setupTestStorage(t *testing.T) (*Storage, func()) {
 	}
 
 	storage := &Storage{
-		db:   db,
-		path: dbPath,
+		db: db,
 	}
 
 	// Initialize buckets
@@ -59,10 +58,6 @@ func TestNewStorage(t *testing.T) {
 
 	if storage.db == nil {
 		t.Fatal("Expected db to be non-nil")
-	}
-
-	if storage.path == "" {
-		t.Fatal("Expected path to be set")
 	}
 }
 
@@ -228,11 +223,8 @@ func TestListModules(t *testing.T) {
 		},
 	}
 
-	for _, module := range modules {
-		err := storage.UpsertModule(ctx, module)
-		if err != nil {
-			t.Fatalf("UpsertModule failed: %v", err)
-		}
+	if err := storage.UpsertModules(ctx, modules); err != nil {
+		t.Fatalf("UpsertModules failed: %v", err)
 	}
 
 	// List all modules
@@ -515,11 +507,8 @@ func TestTimeIndex(t *testing.T) {
 		},
 	}
 
-	for _, module := range modules {
-		err := storage.UpsertModule(ctx, module)
-		if err != nil {
-			t.Fatalf("UpsertModule failed: %v", err)
-		}
+	if err := storage.UpsertModules(ctx, modules); err != nil {
+		t.Fatalf("UpsertModules failed: %v", err)
 	}
 
 	// List should return in descending timestamp order
