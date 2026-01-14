@@ -41,7 +41,16 @@ func Installer(cmd *cobra.Command, args []string) error {
 
 	cmd.Println("Installing module:", newModule.Name)
 
-	if err := newModule.InstallModule(cmd.Context()); err != nil {
+	// Use streaming installation to show real-time output
+	outputHandler := func(stream string, line string) {
+		if stream == "stderr" {
+			_, _ = fmt.Fprintln(cmd.ErrOrStderr(), line)
+		} else {
+			_, _ = fmt.Fprintln(cmd.OutOrStdout(), line)
+		}
+	}
+
+	if err := newModule.InstallModuleWithStreaming(cmd.Context(), outputHandler); err != nil {
 		return err
 	}
 
@@ -49,7 +58,7 @@ func Installer(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	cmd.Println("Module is installer successfully:", newModule.Name)
+	cmd.Println("Module installed successfully:", newModule.Name)
 	cmd.Printf("Show report using: %s report %s\n", cmd.Root().Name(), newModule.Name)
 
 	return nil
