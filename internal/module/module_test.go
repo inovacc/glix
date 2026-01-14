@@ -7,6 +7,7 @@ import (
 
 func TestModule_Check(t *testing.T) {
 	tmpDir := t.TempDir()
+
 	mod, err := NewModule(context.TODO(), "go", tmpDir)
 	if err != nil {
 		t.Fatal(err)
@@ -24,6 +25,7 @@ func TestModule_Check(t *testing.T) {
 
 func TestModule_Check_Latest(t *testing.T) {
 	tmpDir := t.TempDir()
+
 	mod, err := NewModule(context.TODO(), "go", tmpDir)
 	if err != nil {
 		t.Fatal(err)

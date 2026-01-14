@@ -41,11 +41,13 @@ func ExecuteWithStreaming(ctx context.Context, handler OutputHandler, name strin
 
 	go func() {
 		defer wg.Done()
+
 		streamLines(stdoutPipe, "stdout", handler)
 	}()
 
 	go func() {
 		defer wg.Done()
+
 		streamLines(stderrPipe, "stderr", handler)
 	}()
 
@@ -94,6 +96,7 @@ func (m *Module) InstallModuleWithStreaming(ctx context.Context, handler OutputH
 		if handler != nil {
 			handler("stdout", fmt.Sprintf("Found GoReleaser config: %s", configPath))
 		}
+
 		return m.installViaGoReleaserWithStreaming(ctx, moduleDir, handler)
 	}
 
@@ -110,6 +113,7 @@ func (m *Module) InstallModuleWithStreaming(ctx context.Context, handler OutputH
 	gobin := fmt.Sprintf("%s/bin", gopath)
 
 	cmd := exec.CommandContext(ctx, m.goBinPath, "install", modulePath)
+
 	cmd.Env = append(os.Environ(), fmt.Sprintf("GOBIN=%s", gobin))
 
 	stdoutPipe, err := cmd.StdoutPipe()
@@ -131,11 +135,13 @@ func (m *Module) InstallModuleWithStreaming(ctx context.Context, handler OutputH
 
 	go func() {
 		defer wg.Done()
+
 		streamLines(stdoutPipe, "stdout", handler)
 	}()
 
 	go func() {
 		defer wg.Done()
+
 		streamLines(stderrPipe, "stderr", handler)
 	}()
 
@@ -155,6 +161,7 @@ func (m *Module) installViaGoReleaserWithStreaming(ctx context.Context, moduleDi
 		if handler != nil {
 			handler("stdout", "GoReleaser not found, installing...")
 		}
+
 		if err := ExecuteWithStreaming(ctx, handler, m.goBinPath, "install", "github.com/goreleaser/goreleaser/v2@latest"); err != nil {
 			return fmt.Errorf("failed to install goreleaser: %w", err)
 		}
@@ -185,11 +192,13 @@ func (m *Module) installViaGoReleaserWithStreaming(ctx context.Context, moduleDi
 
 	// Set environment variables
 	env := os.Environ()
+
 	parts := strings.Split(m.Name, "/")
 	if len(parts) >= 2 {
 		owner := parts[len(parts)-2]
 		env = append(env, fmt.Sprintf("GITHUB_OWNER=%s", owner))
 	}
+
 	cmd.Env = env
 
 	stdoutPipe, err := cmd.StdoutPipe()
@@ -211,11 +220,13 @@ func (m *Module) installViaGoReleaserWithStreaming(ctx context.Context, moduleDi
 
 	go func() {
 		defer wg.Done()
+
 		streamLines(stdoutPipe, "stdout", handler)
 	}()
 
 	go func() {
 		defer wg.Done()
+
 		streamLines(stderrPipe, "stderr", handler)
 	}()
 
@@ -231,6 +242,7 @@ func (m *Module) installViaGoReleaserWithStreaming(ctx context.Context, moduleDi
 
 	// Find the built binary in the dist directory
 	distDir := filepath.Join(buildDir, "dist")
+
 	binaryPath, err := m.findBuiltBinary(distDir)
 	if err != nil {
 		return fmt.Errorf("failed to find built binary: %w", err)

@@ -36,6 +36,7 @@ func setupTestStorage(t *testing.T) (*Storage, func()) {
 	// Initialize buckets
 	if err := storage.initBuckets(); err != nil {
 		_ = db.Close()
+
 		t.Fatalf("Failed to initialize buckets: %v", err)
 	}
 
@@ -115,6 +116,7 @@ func TestUpsertModule_Update(t *testing.T) {
 
 	// Update with new hash
 	module.Hash = "def456"
+
 	err = storage.UpsertModule(module)
 	if err != nil {
 		t.Fatalf("Second UpsertModule failed: %v", err)
@@ -528,14 +530,15 @@ func TestConcurrentReads(t *testing.T) {
 	// Test concurrent reads (BoltDB supports multiple readers)
 	done := make(chan bool)
 
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		go func() {
 			_, _ = storage.ListModules()
+
 			done <- true
 		}()
 	}
 
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		<-done
 	}
 

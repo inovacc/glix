@@ -25,6 +25,7 @@ type Config struct {
 	DatabasePath string
 	Port         int
 	BindAddress  string
+	IdleTimeout  time.Duration // If > 0, server shuts down after this duration of inactivity
 	Logger       *slog.Logger
 }
 
@@ -32,12 +33,14 @@ type Config struct {
 type Server struct {
 	pb.UnimplementedGlixServiceServer
 
-	config    Config
-	db        *database.Storage
-	grpcSrv   *grpc.Server
-	listener  net.Listener
-	startTime time.Time
-	logger    *slog.Logger
+	config       Config
+	db           *database.Storage
+	grpcSrv      *grpc.Server
+	listener     net.Listener
+	startTime    time.Time
+	lastActivity time.Time
+	logger       *slog.Logger
+	cancelIdle   context.CancelFunc
 
 	mu      sync.RWMutex
 	running bool
@@ -49,9 +52,11 @@ func New(cfg Config) (*Server, error) {
 	if cfg.Port == 0 {
 		cfg.Port = DefaultPort
 	}
+
 	if cfg.BindAddress == "" {
 		cfg.BindAddress = "localhost"
 	}
+
 	if cfg.Namespace == "" {
 		hostname, err := os.Hostname()
 		if err != nil {
@@ -60,9 +65,11 @@ func New(cfg Config) (*Server, error) {
 			cfg.Namespace = hostname
 		}
 	}
+
 	if cfg.DatabasePath == "" {
 		cfg.DatabasePath = module.GetDatabaseDirectory()
 	}
+
 	if cfg.Logger == nil {
 		cfg.Logger = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 			Level: slog.LevelInfo,
@@ -85,12 +92,14 @@ func New(cfg Config) (*Server, error) {
 // Start starts the gRPC server
 func (s *Server) Start(ctx context.Context) error {
 	s.mu.Lock()
+
 	if s.running {
 		s.mu.Unlock()
 		return fmt.Errorf("server is already running")
 	}
 
 	addr := fmt.Sprintf("%s:%d", s.config.BindAddress, s.config.Port)
+
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
 		s.mu.Unlock()
@@ -100,10 +109,12 @@ func (s *Server) Start(ctx context.Context) error {
 	s.listener = listener
 	s.grpcSrv = grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
+			s.activityInterceptor,
 			s.loggingInterceptor,
 			s.recoveryInterceptor,
 		),
 		grpc.ChainStreamInterceptor(
+			s.streamActivityInterceptor,
 			s.streamLoggingInterceptor,
 			s.streamRecoveryInterceptor,
 		),
@@ -116,6 +127,7 @@ func (s *Server) Start(ctx context.Context) error {
 	reflection.Register(s.grpcSrv)
 
 	s.startTime = time.Now()
+	s.lastActivity = time.Now()
 	s.running = true
 	s.mu.Unlock()
 
@@ -123,6 +135,7 @@ func (s *Server) Start(ctx context.Context) error {
 		"address", addr,
 		"namespace", s.config.Namespace,
 		"database", s.config.DatabasePath,
+		"idle_timeout", s.config.IdleTimeout,
 	)
 
 	// Handle context cancellation
@@ -131,12 +144,54 @@ func (s *Server) Start(ctx context.Context) error {
 		s.Stop()
 	}()
 
+	// Start idle monitor if timeout is configured
+	if s.config.IdleTimeout > 0 {
+		idleCtx, cancel := context.WithCancel(ctx)
+
+		s.cancelIdle = cancel
+		go s.monitorIdle(idleCtx)
+	}
+
 	// Serve requests
 	if err := s.grpcSrv.Serve(listener); err != nil {
 		return fmt.Errorf("server error: %w", err)
 	}
 
 	return nil
+}
+
+// touchActivity updates the last activity timestamp
+func (s *Server) touchActivity() {
+	s.mu.Lock()
+	s.lastActivity = time.Now()
+	s.mu.Unlock()
+}
+
+// monitorIdle monitors for idle timeout and shuts down the server
+func (s *Server) monitorIdle(ctx context.Context) {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			s.mu.RLock()
+			idle := time.Since(s.lastActivity)
+			s.mu.RUnlock()
+
+			if idle >= s.config.IdleTimeout {
+				s.logger.Info("idle timeout reached, shutting down",
+					"idle_duration", idle,
+					"timeout", s.config.IdleTimeout,
+				)
+				s.Stop()
+
+				return
+			}
+		}
+	}
 }
 
 // Stop gracefully stops the gRPC server
@@ -168,6 +223,7 @@ func (s *Server) Stop() {
 func (s *Server) IsRunning() bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+
 	return s.running
 }
 

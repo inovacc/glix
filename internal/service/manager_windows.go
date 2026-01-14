@@ -31,6 +31,7 @@ func (m *windowsManager) Install(ctx context.Context, cfg Config) error {
 	if err != nil {
 		return fmt.Errorf("failed to connect to service manager: %w", err)
 	}
+
 	defer func() {
 		_ = scm.Disconnect()
 	}()
@@ -61,6 +62,7 @@ func (m *windowsManager) Install(ctx context.Context, cfg Config) error {
 	if err != nil {
 		return fmt.Errorf("failed to create service: %w (binPath: %s)", err, binPath)
 	}
+
 	defer func() {
 		_ = s.Close()
 	}()
@@ -86,6 +88,7 @@ func (m *windowsManager) Uninstall(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to connect to service manager: %w", err)
 	}
+
 	defer func() {
 		_ = scm.Disconnect()
 	}()
@@ -94,6 +97,7 @@ func (m *windowsManager) Uninstall(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("service %s not found: %w", ServiceName, err)
 	}
+
 	defer func() {
 		_ = s.Close()
 	}()
@@ -103,11 +107,12 @@ func (m *windowsManager) Uninstall(ctx context.Context) error {
 	if err == nil && status.State != svc.Stopped {
 		_, _ = s.Control(svc.Stop)
 		// Wait for stop
-		for i := 0; i < 30; i++ {
+		for range 30 {
 			status, err = s.Query()
 			if err != nil || status.State == svc.Stopped {
 				break
 			}
+
 			time.Sleep(time.Second)
 		}
 	}
@@ -127,6 +132,7 @@ func (m *windowsManager) Start(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to connect to service manager: %w", err)
 	}
+
 	defer func() {
 		_ = scm.Disconnect()
 	}()
@@ -135,6 +141,7 @@ func (m *windowsManager) Start(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("service %s not found: %w", ServiceName, err)
 	}
+
 	defer func() {
 		_ = s.Close()
 	}()
@@ -144,17 +151,20 @@ func (m *windowsManager) Start(ctx context.Context) error {
 	}
 
 	// Wait for service to start
-	for i := 0; i < 30; i++ {
+	for range 30 {
 		status, err := s.Query()
 		if err != nil {
 			return fmt.Errorf("failed to query service status: %w", err)
 		}
+
 		if status.State == svc.Running {
 			return nil
 		}
+
 		if status.State == svc.Stopped {
 			return fmt.Errorf("service stopped unexpectedly")
 		}
+
 		time.Sleep(time.Second)
 	}
 
@@ -168,6 +178,7 @@ func (m *windowsManager) Stop(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to connect to service manager: %w", err)
 	}
+
 	defer func() {
 		_ = scm.Disconnect()
 	}()
@@ -176,6 +187,7 @@ func (m *windowsManager) Stop(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("service %s not found: %w", ServiceName, err)
 	}
+
 	defer func() {
 		_ = s.Close()
 	}()
@@ -195,14 +207,16 @@ func (m *windowsManager) Stop(ctx context.Context) error {
 	}
 
 	// Wait for service to stop
-	for i := 0; i < 30; i++ {
+	for range 30 {
 		status, err := s.Query()
 		if err != nil {
 			return fmt.Errorf("failed to query service status: %w", err)
 		}
+
 		if status.State == svc.Stopped {
 			return nil
 		}
+
 		time.Sleep(time.Second)
 	}
 
@@ -216,6 +230,7 @@ func (m *windowsManager) Status(ctx context.Context) (*Status, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to service manager: %w", err)
 	}
+
 	defer func() {
 		_ = scm.Disconnect()
 	}()
@@ -227,6 +242,7 @@ func (m *windowsManager) Status(ctx context.Context) (*Status, error) {
 			Description: "Service not installed",
 		}, nil
 	}
+
 	defer func() {
 		_ = s.Close()
 	}()
@@ -237,6 +253,7 @@ func (m *windowsManager) Status(ctx context.Context) (*Status, error) {
 	}
 
 	var desc string
+
 	switch status.State {
 	case svc.Stopped:
 		desc = "Stopped"
@@ -268,6 +285,7 @@ func (m *windowsManager) IsInstalled() bool {
 	if err != nil {
 		return false
 	}
+
 	defer func() {
 		_ = scm.Disconnect()
 	}()
@@ -276,6 +294,8 @@ func (m *windowsManager) IsInstalled() bool {
 	if err != nil {
 		return false
 	}
+
 	_ = s.Close()
+
 	return true
 }

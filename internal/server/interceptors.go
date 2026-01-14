@@ -10,13 +10,35 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+// activityInterceptor updates the last activity timestamp for unary RPCs
+func (s *Server) activityInterceptor(
+	ctx context.Context,
+	req any,
+	info *grpc.UnaryServerInfo,
+	handler grpc.UnaryHandler,
+) (any, error) {
+	s.touchActivity()
+	return handler(ctx, req)
+}
+
+// streamActivityInterceptor updates the last activity timestamp for streaming RPCs
+func (s *Server) streamActivityInterceptor(
+	srv any,
+	ss grpc.ServerStream,
+	info *grpc.StreamServerInfo,
+	handler grpc.StreamHandler,
+) error {
+	s.touchActivity()
+	return handler(srv, ss)
+}
+
 // loggingInterceptor logs unary RPC calls
 func (s *Server) loggingInterceptor(
 	ctx context.Context,
-	req interface{},
+	req any,
 	info *grpc.UnaryServerInfo,
 	handler grpc.UnaryHandler,
-) (interface{}, error) {
+) (any, error) {
 	start := time.Now()
 
 	resp, err := handler(ctx, req)
@@ -42,10 +64,10 @@ func (s *Server) loggingInterceptor(
 // recoveryInterceptor recovers from panics in unary RPC handlers
 func (s *Server) recoveryInterceptor(
 	ctx context.Context,
-	req interface{},
+	req any,
 	info *grpc.UnaryServerInfo,
 	handler grpc.UnaryHandler,
-) (resp interface{}, err error) {
+) (resp any, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			s.logger.Error("panic recovered in unary RPC",
@@ -53,6 +75,7 @@ func (s *Server) recoveryInterceptor(
 				"panic", r,
 				"stack", string(debug.Stack()),
 			)
+
 			err = status.Errorf(codes.Internal, "internal server error")
 		}
 	}()
@@ -62,7 +85,7 @@ func (s *Server) recoveryInterceptor(
 
 // streamLoggingInterceptor logs streaming RPC calls
 func (s *Server) streamLoggingInterceptor(
-	srv interface{},
+	srv any,
 	ss grpc.ServerStream,
 	info *grpc.StreamServerInfo,
 	handler grpc.StreamHandler,
@@ -91,7 +114,7 @@ func (s *Server) streamLoggingInterceptor(
 
 // streamRecoveryInterceptor recovers from panics in streaming RPC handlers
 func (s *Server) streamRecoveryInterceptor(
-	srv interface{},
+	srv any,
 	ss grpc.ServerStream,
 	info *grpc.StreamServerInfo,
 	handler grpc.StreamHandler,
@@ -103,6 +126,7 @@ func (s *Server) streamRecoveryInterceptor(
 				"panic", r,
 				"stack", string(debug.Stack()),
 			)
+
 			err = status.Errorf(codes.Internal, "internal server error")
 		}
 	}()

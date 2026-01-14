@@ -2,6 +2,7 @@ package database
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -91,7 +92,7 @@ func (s *Storage) UpsertModule(module *pb.ModuleProto) error {
 		}
 
 		// Create composite key: name@version
-		key := []byte(fmt.Sprintf("%s@%s", module.GetName(), module.GetVersion()))
+		key := fmt.Appendf(nil, "%s@%s", module.GetName(), module.GetVersion())
 
 		// Store in modules bucket
 		bucket := tx.Bucket(modulesBucket)
@@ -118,7 +119,7 @@ func (s *Storage) GetModule(name, version string) (*pb.ModuleProto, error) {
 	var module *pb.ModuleProto
 
 	err := s.db.View(func(tx *bolt.Tx) error {
-		key := []byte(fmt.Sprintf("%s@%s", name, version))
+		key := fmt.Appendf(nil, "%s@%s", name, version)
 		bucket := tx.Bucket(modulesBucket)
 
 		data := bucket.Get(key)
@@ -203,7 +204,7 @@ func (s *Storage) ListModules() ([]*pb.ModuleProto, error) {
 // DeleteModule removes a module and updates indexes
 func (s *Storage) DeleteModule(name, version string) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
-		key := []byte(fmt.Sprintf("%s@%s", name, version))
+		key := fmt.Appendf(nil, "%s@%s", name, version)
 
 		// Get module first to access timestamp
 		bucket := tx.Bucket(modulesBucket)
@@ -323,7 +324,7 @@ func (s *Storage) updateTimeIndex(tx *bolt.Tx, timestamp int64, moduleKey string
 	bucket := tx.Bucket(timeIndexBucket)
 
 	// Use timestamp as key for sorting
-	key := []byte(fmt.Sprintf("%020d", timestamp)) // Zero-padded for lexicographic sorting
+	key := fmt.Appendf(nil, "%020d", timestamp) // Zero-padded for lexicographic sorting
 	value := []byte(moduleKey)
 
 	return bucket.Put(key, value)
@@ -332,7 +333,7 @@ func (s *Storage) updateTimeIndex(tx *bolt.Tx, timestamp int64, moduleKey string
 // deleteFromTimeIndex removes an entry from the time index
 func (s *Storage) deleteFromTimeIndex(tx *bolt.Tx, timestamp int64) error {
 	bucket := tx.Bucket(timeIndexBucket)
-	key := []byte(fmt.Sprintf("%020d", timestamp))
+	key := fmt.Appendf(nil, "%020d", timestamp)
 
 	return bucket.Delete(key)
 }
@@ -353,14 +354,7 @@ func (s *Storage) updateNameIndex(tx *bolt.Tx, name, version string) error {
 	}
 
 	// Add version if not already present
-	found := false
-
-	for _, v := range versionList.GetVersions() {
-		if v == version {
-			found = true
-			break
-		}
-	}
+	found := slices.Contains(versionList.GetVersions(), version)
 
 	if !found {
 		versionList.Versions = append(versionList.Versions, version)

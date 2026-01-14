@@ -14,9 +14,9 @@ import (
 // Install installs a Go module (non-streaming)
 func (s *Server) Install(ctx context.Context, req *pb.InstallRequest) (*pb.InstallResponse, error) {
 	s.logger.Info("install request",
-		"module", req.ModulePath,
-		"version", req.Version,
-		"force", req.Force,
+		"module", req.GetModulePath(),
+		"version", req.GetVersion(),
+		"force", req.GetForce(),
 	)
 
 	cacheDir, err := module.GetApplicationCacheDirectory()
@@ -35,9 +35,9 @@ func (s *Server) Install(ctx context.Context, req *pb.InstallRequest) (*pb.Insta
 		}, nil
 	}
 
-	modulePath := req.ModulePath
-	if req.Version != "" && req.Version != "latest" {
-		modulePath = fmt.Sprintf("%s@%s", req.ModulePath, req.Version)
+	modulePath := req.GetModulePath()
+	if req.GetVersion() != "" && req.GetVersion() != "latest" {
+		modulePath = fmt.Sprintf("%s@%s", req.GetModulePath(), req.GetVersion())
 	}
 
 	if err := m.FetchModuleInfo(modulePath); err != nil {
@@ -72,9 +72,9 @@ func (s *Server) InstallStream(req *pb.InstallRequest, stream grpc.ServerStreami
 	ctx := stream.Context()
 
 	s.logger.Info("install stream request",
-		"module", req.ModulePath,
-		"version", req.Version,
-		"force", req.Force,
+		"module", req.GetModulePath(),
+		"version", req.GetVersion(),
+		"force", req.GetForce(),
 	)
 
 	// Send initial progress
@@ -100,9 +100,9 @@ func (s *Server) InstallStream(req *pb.InstallRequest, stream grpc.ServerStreami
 		return sendInstallError(stream, fmt.Sprintf("failed to create module: %v", err))
 	}
 
-	modulePath := req.ModulePath
-	if req.Version != "" && req.Version != "latest" {
-		modulePath = fmt.Sprintf("%s@%s", req.ModulePath, req.Version)
+	modulePath := req.GetModulePath()
+	if req.GetVersion() != "" && req.GetVersion() != "latest" {
+		modulePath = fmt.Sprintf("%s@%s", req.GetModulePath(), req.GetVersion())
 	}
 
 	// Send fetching progress
@@ -184,16 +184,46 @@ func (s *Server) InstallStream(req *pb.InstallRequest, stream grpc.ServerStreami
 // Remove removes an installed module
 func (s *Server) Remove(ctx context.Context, req *pb.RemoveRequest) (*pb.RemoveResponse, error) {
 	s.logger.Info("remove request",
-		"module", req.ModulePath,
-		"version", req.Version,
+		"module", req.GetModulePath(),
+		"version", req.GetVersion(),
 	)
 
-	version := req.Version
+	version := req.GetVersion()
+
+	// If no version specified, look up the module by name to find installed versions
 	if version == "" {
-		version = "latest"
+		mods, err := s.db.GetModuleByName(req.GetModulePath())
+		if err != nil || len(mods) == 0 {
+			return &pb.RemoveResponse{
+				Success:      false,
+				ErrorMessage: fmt.Sprintf("module not found: %s", req.GetModulePath()),
+			}, nil
+		}
+
+		// Remove all versions found
+		var lastErr error
+		removed := 0
+		for _, mod := range mods {
+			if err := s.db.DeleteModule(mod.GetName(), mod.GetVersion()); err != nil {
+				lastErr = err
+			} else {
+				removed++
+			}
+		}
+
+		if removed == 0 && lastErr != nil {
+			return &pb.RemoveResponse{
+				Success:      false,
+				ErrorMessage: fmt.Sprintf("failed to delete module: %v", lastErr),
+			}, nil
+		}
+
+		return &pb.RemoveResponse{
+			Success: true,
+		}, nil
 	}
 
-	if err := s.db.DeleteModule(req.ModulePath, version); err != nil {
+	if err := s.db.DeleteModule(req.GetModulePath(), version); err != nil {
 		return &pb.RemoveResponse{
 			Success:      false,
 			ErrorMessage: fmt.Sprintf("failed to delete module: %v", err),
@@ -207,7 +237,7 @@ func (s *Server) Remove(ctx context.Context, req *pb.RemoveRequest) (*pb.RemoveR
 
 // Update updates a module (stub for now)
 func (s *Server) Update(ctx context.Context, req *pb.UpdateRequest) (*pb.UpdateResponse, error) {
-	s.logger.Info("update request", "module", req.ModulePath)
+	s.logger.Info("update request", "module", req.GetModulePath())
 
 	return &pb.UpdateResponse{
 		Success:      false,
@@ -217,7 +247,7 @@ func (s *Server) Update(ctx context.Context, req *pb.UpdateRequest) (*pb.UpdateR
 
 // UpdateStream updates a module with streaming (stub for now)
 func (s *Server) UpdateStream(req *pb.UpdateRequest, stream grpc.ServerStreamingServer[pb.InstallProgress]) error {
-	s.logger.Info("update stream request", "module", req.ModulePath)
+	s.logger.Info("update stream request", "module", req.GetModulePath())
 
 	return sendInstallError(stream, "update not yet implemented")
 }
@@ -225,9 +255,9 @@ func (s *Server) UpdateStream(req *pb.UpdateRequest, stream grpc.ServerStreaming
 // ListModules returns all installed modules
 func (s *Server) ListModules(ctx context.Context, req *pb.ListModulesRequest) (*pb.ListModulesResponse, error) {
 	s.logger.Debug("list modules request",
-		"limit", req.Limit,
-		"offset", req.Offset,
-		"filter", req.NameFilter,
+		"limit", req.GetLimit(),
+		"offset", req.GetOffset(),
+		"filter", req.GetNameFilter(),
 	)
 
 	modules, err := s.db.ListModules()
@@ -237,21 +267,23 @@ func (s *Server) ListModules(ctx context.Context, req *pb.ListModulesRequest) (*
 
 	// Apply filtering if provided
 	var filteredModules []*pb.ModuleProto
+
 	for _, m := range modules {
-		if req.NameFilter != "" {
+		if req.GetNameFilter() != "" {
 			// Simple contains filter
-			if !containsIgnoreCase(m.Name, req.NameFilter) {
+			if !containsIgnoreCase(m.GetName(), req.GetNameFilter()) {
 				continue
 			}
 		}
+
 		filteredModules = append(filteredModules, m)
 	}
 
 	totalCount := int64(len(filteredModules))
 
 	// Apply pagination
-	offset := int(req.Offset)
-	limit := int(req.Limit)
+	offset := int(req.GetOffset())
+	limit := int(req.GetLimit())
 
 	if offset > len(filteredModules) {
 		filteredModules = nil
@@ -271,23 +303,26 @@ func (s *Server) ListModules(ctx context.Context, req *pb.ListModulesRequest) (*
 // GetModule retrieves a specific module
 func (s *Server) GetModule(ctx context.Context, req *pb.GetModuleRequest) (*pb.GetModuleResponse, error) {
 	s.logger.Debug("get module request",
-		"name", req.Name,
-		"version", req.Version,
+		"name", req.GetName(),
+		"version", req.GetVersion(),
 	)
 
-	var mod *pb.ModuleProto
-	var err error
+	var (
+		mod *pb.ModuleProto
+		err error
+	)
 
-	if req.Version != "" {
-		mod, err = s.db.GetModule(req.Name, req.Version)
+	if req.GetVersion() != "" {
+		mod, err = s.db.GetModule(req.GetName(), req.GetVersion())
 	} else {
 		// Get by name (returns all versions, pick latest)
-		mods, getErr := s.db.GetModuleByName(req.Name)
+		mods, getErr := s.db.GetModuleByName(req.GetName())
 		if getErr != nil || len(mods) == 0 {
 			return &pb.GetModuleResponse{
 				Found: false,
 			}, nil
 		}
+
 		mod = mods[0] // Return the first (most recent) one
 		err = nil
 	}
@@ -307,13 +342,13 @@ func (s *Server) GetModule(ctx context.Context, req *pb.GetModuleRequest) (*pb.G
 // GetDependencies retrieves dependencies for a module
 func (s *Server) GetDependencies(ctx context.Context, req *pb.GetModuleRequest) (*pb.GetDependenciesResponse, error) {
 	s.logger.Debug("get dependencies request",
-		"name", req.Name,
-		"version", req.Version,
+		"name", req.GetName(),
+		"version", req.GetVersion(),
 	)
 
-	key := req.Name
-	if req.Version != "" {
-		key = fmt.Sprintf("%s@%s", req.Name, req.Version)
+	key := req.GetName()
+	if req.GetVersion() != "" {
+		key = fmt.Sprintf("%s@%s", req.GetName(), req.GetVersion())
 	}
 
 	deps, err := s.db.GetDependenciesByModule(key)
@@ -364,6 +399,7 @@ func sendInstallError(stream grpc.ServerStreamingServer[pb.InstallProgress], err
 	}); err != nil {
 		return fmt.Errorf("failed to send error: %w", err)
 	}
+
 	return nil
 }
 
@@ -396,6 +432,7 @@ func containsIgnoreCase(s, substr string) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -403,18 +440,23 @@ func equalIgnoreCase(a, b string) bool {
 	if len(a) != len(b) {
 		return false
 	}
+
 	for i := 0; i < len(a); i++ {
 		ca := a[i]
 		cb := b[i]
+
 		if ca >= 'A' && ca <= 'Z' {
 			ca += 'a' - 'A'
 		}
+
 		if cb >= 'A' && cb <= 'Z' {
 			cb += 'a' - 'A'
 		}
+
 		if ca != cb {
 			return false
 		}
 	}
+
 	return true
 }

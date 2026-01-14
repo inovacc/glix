@@ -186,6 +186,7 @@ func (m *Module) getModuleSourceDir(ctx context.Context) (string, error) {
 	if modulePath == "" {
 		modulePath = m.Name // Fallback for backwards compatibility
 	}
+
 	cmd := exec.CommandContext(ctx, m.goBinPath, "mod", "download", "-json", fmt.Sprintf("%s@%s", modulePath, m.Version))
 
 	var out bytes.Buffer
@@ -434,6 +435,7 @@ func (m *Module) fetchModuleVersions(ctx context.Context, module string) (*fetch
 			if err != nil {
 				return nil, err
 			}
+
 			return &fetchModuleVersionsResult{ListResp: lr, RootModule: module}, nil
 		}
 	}

@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"github.com/inovacc/glix/internal/installer"
 	"github.com/spf13/cobra"
 )
 
@@ -17,6 +16,7 @@ Usage:
   glix install <module>  - Install a Go module
   glix remove <module>   - Remove an installed module
   glix update <module>   - Update a module to latest version
+  glix service <cmd>     - Manage the glix background service
   glix <module>          - Shorthand for install`,
 	Args: cobra.ArbitraryArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -25,7 +25,8 @@ Usage:
 		}
 
 		// Direct invocation acts as shorthand for installation
-		return installer.Installer(cmd, args)
+		// Reuse the install command logic
+		return runInstall(cmd, args)
 	},
 }
 

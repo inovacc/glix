@@ -63,6 +63,7 @@ func GetExecutablePath() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to get executable path: %w", err)
 	}
+
 	return filepath.Abs(exe)
 }
 
@@ -73,12 +74,15 @@ func BuildServiceArgs(cfg Config) []string {
 	if cfg.Namespace != "" {
 		args = append(args, "--namespace", cfg.Namespace)
 	}
+
 	if cfg.DatabasePath != "" {
 		args = append(args, "--database", cfg.DatabasePath)
 	}
+
 	if cfg.Port != 0 {
 		args = append(args, "--port", fmt.Sprintf("%d", cfg.Port))
 	}
+
 	if cfg.BindAddress != "" {
 		args = append(args, "--bind", cfg.BindAddress)
 	}
