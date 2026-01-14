@@ -18,11 +18,10 @@ root is not installable.
 Examples:
   glix install github.com/inovacc/twig
   glix install https://github.com/inovacc/twig
+  glix install github.com/inovacc/twig@latest
   glix install github.com/inovacc/twig@v1.0.0`,
 	Args: cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		return installer.Installer(cmd, args)
-	},
+	RunE: installer.Installer,
 }
 
 func init() {

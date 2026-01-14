@@ -1,7 +1,6 @@
 package database
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -65,8 +64,6 @@ func TestUpsertModule(t *testing.T) {
 	storage, cleanup := setupTestStorage(t)
 	defer cleanup()
 
-	ctx := context.Background()
-
 	module := &pb.ModuleProto{
 		Name:              "github.com/test/module",
 		Version:           "v1.0.0",
@@ -75,13 +72,13 @@ func TestUpsertModule(t *testing.T) {
 		TimestampUnixNano: time.Now().UnixNano(),
 	}
 
-	err := storage.UpsertModule(ctx, module)
+	err := storage.UpsertModule(module)
 	if err != nil {
 		t.Fatalf("UpsertModule failed: %v", err)
 	}
 
 	// Verify module was inserted
-	retrieved, err := storage.GetModule(ctx, module.GetName(), module.GetVersion())
+	retrieved, err := storage.GetModule(module.GetName(), module.GetVersion())
 	if err != nil {
 		t.Fatalf("GetModule failed: %v", err)
 	}
@@ -103,8 +100,6 @@ func TestUpsertModule_Update(t *testing.T) {
 	storage, cleanup := setupTestStorage(t)
 	defer cleanup()
 
-	ctx := context.Background()
-
 	module := &pb.ModuleProto{
 		Name:              "github.com/test/module",
 		Version:           "v1.0.0",
@@ -113,20 +108,20 @@ func TestUpsertModule_Update(t *testing.T) {
 	}
 
 	// Insert
-	err := storage.UpsertModule(ctx, module)
+	err := storage.UpsertModule(module)
 	if err != nil {
 		t.Fatalf("First UpsertModule failed: %v", err)
 	}
 
 	// Update with new hash
 	module.Hash = "def456"
-	err = storage.UpsertModule(ctx, module)
+	err = storage.UpsertModule(module)
 	if err != nil {
 		t.Fatalf("Second UpsertModule failed: %v", err)
 	}
 
 	// Verify update
-	retrieved, err := storage.GetModule(ctx, module.GetName(), module.GetVersion())
+	retrieved, err := storage.GetModule(module.GetName(), module.GetVersion())
 	if err != nil {
 		t.Fatalf("GetModule failed: %v", err)
 	}
@@ -140,9 +135,7 @@ func TestGetModule_NotFound(t *testing.T) {
 	storage, cleanup := setupTestStorage(t)
 	defer cleanup()
 
-	ctx := context.Background()
-
-	_, err := storage.GetModule(ctx, "nonexistent", "v1.0.0")
+	_, err := storage.GetModule("nonexistent", "v1.0.0")
 	if err == nil {
 		t.Fatal("Expected error for non-existent module")
 	}
@@ -157,8 +150,6 @@ func TestGetModuleByName(t *testing.T) {
 	storage, cleanup := setupTestStorage(t)
 	defer cleanup()
 
-	ctx := context.Background()
-
 	moduleName := "github.com/test/module"
 
 	// Insert multiple versions
@@ -171,14 +162,14 @@ func TestGetModuleByName(t *testing.T) {
 			TimestampUnixNano: time.Now().UnixNano() + int64(i*1000000),
 		}
 
-		err := storage.UpsertModule(ctx, module)
+		err := storage.UpsertModule(module)
 		if err != nil {
 			t.Fatalf("UpsertModule failed for %s: %v", version, err)
 		}
 	}
 
 	// Retrieve all versions
-	modules, err := storage.GetModuleByName(ctx, moduleName)
+	modules, err := storage.GetModuleByName(moduleName)
 	if err != nil {
 		t.Fatalf("GetModuleByName failed: %v", err)
 	}
@@ -198,8 +189,6 @@ func TestGetModuleByName(t *testing.T) {
 func TestListModules(t *testing.T) {
 	storage, cleanup := setupTestStorage(t)
 	defer cleanup()
-
-	ctx := context.Background()
 
 	// Insert multiple modules with different timestamps
 	modules := []*pb.ModuleProto{
@@ -223,12 +212,12 @@ func TestListModules(t *testing.T) {
 		},
 	}
 
-	if err := storage.UpsertModules(ctx, modules); err != nil {
+	if err := storage.UpsertModules(modules); err != nil {
 		t.Fatalf("UpsertModules failed: %v", err)
 	}
 
 	// List all modules
-	allModules, err := storage.ListModules(ctx)
+	allModules, err := storage.ListModules()
 	if err != nil {
 		t.Fatalf("ListModules failed: %v", err)
 	}
@@ -249,8 +238,6 @@ func TestDeleteModule(t *testing.T) {
 	storage, cleanup := setupTestStorage(t)
 	defer cleanup()
 
-	ctx := context.Background()
-
 	module := &pb.ModuleProto{
 		Name:              "github.com/test/module",
 		Version:           "v1.0.0",
@@ -259,19 +246,19 @@ func TestDeleteModule(t *testing.T) {
 	}
 
 	// Insert module
-	err := storage.UpsertModule(ctx, module)
+	err := storage.UpsertModule(module)
 	if err != nil {
 		t.Fatalf("UpsertModule failed: %v", err)
 	}
 
 	// Delete module
-	err = storage.DeleteModule(ctx, module.GetName(), module.GetVersion())
+	err = storage.DeleteModule(module.GetName(), module.GetVersion())
 	if err != nil {
 		t.Fatalf("DeleteModule failed: %v", err)
 	}
 
 	// Verify deletion
-	_, err = storage.GetModule(ctx, module.GetName(), module.GetVersion())
+	_, err = storage.GetModule(module.GetName(), module.GetVersion())
 	if err == nil {
 		t.Fatal("Expected error when getting deleted module")
 	}
@@ -281,9 +268,7 @@ func TestDeleteModule_NotFound(t *testing.T) {
 	storage, cleanup := setupTestStorage(t)
 	defer cleanup()
 
-	ctx := context.Background()
-
-	err := storage.DeleteModule(ctx, "nonexistent", "v1.0.0")
+	err := storage.DeleteModule("nonexistent", "v1.0.0")
 	if err == nil {
 		t.Fatal("Expected error when deleting non-existent module")
 	}
@@ -293,10 +278,8 @@ func TestCountModules(t *testing.T) {
 	storage, cleanup := setupTestStorage(t)
 	defer cleanup()
 
-	ctx := context.Background()
-
 	// Initially should be 0
-	count, err := storage.CountModules(ctx)
+	count, err := storage.CountModules()
 	if err != nil {
 		t.Fatalf("CountModules failed: %v", err)
 	}
@@ -314,14 +297,14 @@ func TestCountModules(t *testing.T) {
 			TimestampUnixNano: time.Now().UnixNano() + int64(i*1000000),
 		}
 
-		err := storage.UpsertModule(ctx, module)
+		err := storage.UpsertModule(module)
 		if err != nil {
 			t.Fatalf("UpsertModule failed: %v", err)
 		}
 	}
 
 	// Should be 3
-	count, err = storage.CountModules(ctx)
+	count, err = storage.CountModules()
 	if err != nil {
 		t.Fatalf("CountModules failed: %v", err)
 	}
@@ -334,8 +317,6 @@ func TestCountModules(t *testing.T) {
 func TestUpsertDependencies(t *testing.T) {
 	storage, cleanup := setupTestStorage(t)
 	defer cleanup()
-
-	ctx := context.Background()
 
 	moduleName := "github.com/test/module"
 
@@ -354,13 +335,13 @@ func TestUpsertDependencies(t *testing.T) {
 		},
 	}
 
-	err := storage.UpsertDependencies(ctx, moduleName, deps)
+	err := storage.UpsertDependencies(moduleName, deps)
 	if err != nil {
 		t.Fatalf("UpsertDependencies failed: %v", err)
 	}
 
 	// Verify dependencies were stored
-	retrieved, err := storage.GetDependenciesByModule(ctx, moduleName)
+	retrieved, err := storage.GetDependenciesByModule(moduleName)
 	if err != nil {
 		t.Fatalf("GetDependenciesByModule failed: %v", err)
 	}
@@ -378,9 +359,7 @@ func TestGetDependenciesByModule_NotFound(t *testing.T) {
 	storage, cleanup := setupTestStorage(t)
 	defer cleanup()
 
-	ctx := context.Background()
-
-	_, err := storage.GetDependenciesByModule(ctx, "nonexistent")
+	_, err := storage.GetDependenciesByModule("nonexistent")
 	if err == nil {
 		t.Fatal("Expected error for non-existent dependencies")
 	}
@@ -390,10 +369,8 @@ func TestCountDependencies(t *testing.T) {
 	storage, cleanup := setupTestStorage(t)
 	defer cleanup()
 
-	ctx := context.Background()
-
 	// Initially should be 0
-	count, err := storage.CountDependencies(ctx)
+	count, err := storage.CountDependencies()
 	if err != nil {
 		t.Fatalf("CountDependencies failed: %v", err)
 	}
@@ -413,14 +390,14 @@ func TestCountDependencies(t *testing.T) {
 			},
 		}
 
-		err := storage.UpsertDependencies(ctx, "module"+string(rune('0'+i)), deps)
+		err := storage.UpsertDependencies("module"+string(rune('0'+i)), deps)
 		if err != nil {
 			t.Fatalf("UpsertDependencies failed: %v", err)
 		}
 	}
 
 	// Should be 2 entries (one per module)
-	count, err = storage.CountDependencies(ctx)
+	count, err = storage.CountDependencies()
 	if err != nil {
 		t.Fatalf("CountDependencies failed: %v", err)
 	}
@@ -434,8 +411,6 @@ func TestNameIndex(t *testing.T) {
 	storage, cleanup := setupTestStorage(t)
 	defer cleanup()
 
-	ctx := context.Background()
-
 	moduleName := "github.com/test/module"
 
 	// Insert multiple versions
@@ -448,14 +423,14 @@ func TestNameIndex(t *testing.T) {
 			TimestampUnixNano: time.Now().UnixNano() + int64(i*1000000),
 		}
 
-		err := storage.UpsertModule(ctx, module)
+		err := storage.UpsertModule(module)
 		if err != nil {
 			t.Fatalf("UpsertModule failed: %v", err)
 		}
 	}
 
 	// Get by name should return all versions
-	modules, err := storage.GetModuleByName(ctx, moduleName)
+	modules, err := storage.GetModuleByName(moduleName)
 	if err != nil {
 		t.Fatalf("GetModuleByName failed: %v", err)
 	}
@@ -465,13 +440,13 @@ func TestNameIndex(t *testing.T) {
 	}
 
 	// Delete one version
-	err = storage.DeleteModule(ctx, moduleName, "v1.0.0")
+	err = storage.DeleteModule(moduleName, "v1.0.0")
 	if err != nil {
 		t.Fatalf("DeleteModule failed: %v", err)
 	}
 
 	// Should now return 2 versions
-	modules, err = storage.GetModuleByName(ctx, moduleName)
+	modules, err = storage.GetModuleByName(moduleName)
 	if err != nil {
 		t.Fatalf("GetModuleByName failed after delete: %v", err)
 	}
@@ -484,8 +459,6 @@ func TestNameIndex(t *testing.T) {
 func TestTimeIndex(t *testing.T) {
 	storage, cleanup := setupTestStorage(t)
 	defer cleanup()
-
-	ctx := context.Background()
 
 	// Insert modules with specific timestamps
 	now := time.Now()
@@ -507,12 +480,12 @@ func TestTimeIndex(t *testing.T) {
 		},
 	}
 
-	if err := storage.UpsertModules(ctx, modules); err != nil {
+	if err := storage.UpsertModules(modules); err != nil {
 		t.Fatalf("UpsertModules failed: %v", err)
 	}
 
 	// List should return in descending timestamp order
-	allModules, err := storage.ListModules(ctx)
+	allModules, err := storage.ListModules()
 	if err != nil {
 		t.Fatalf("ListModules failed: %v", err)
 	}
@@ -539,8 +512,6 @@ func TestConcurrentReads(t *testing.T) {
 	storage, cleanup := setupTestStorage(t)
 	defer cleanup()
 
-	ctx := context.Background()
-
 	// Insert a module first
 	module := &pb.ModuleProto{
 		Name:              "github.com/test/module",
@@ -549,7 +520,7 @@ func TestConcurrentReads(t *testing.T) {
 		TimestampUnixNano: time.Now().UnixNano(),
 	}
 
-	err := storage.UpsertModule(ctx, module)
+	err := storage.UpsertModule(module)
 	if err != nil {
 		t.Fatalf("UpsertModule failed: %v", err)
 	}
@@ -559,7 +530,7 @@ func TestConcurrentReads(t *testing.T) {
 
 	for i := 0; i < 5; i++ {
 		go func() {
-			_, _ = storage.ListModules(ctx)
+			_, _ = storage.ListModules()
 			done <- true
 		}()
 	}
@@ -574,8 +545,6 @@ func TestConcurrentReads(t *testing.T) {
 func TestModuleWithDependencies(t *testing.T) {
 	storage, cleanup := setupTestStorage(t)
 	defer cleanup()
-
-	ctx := context.Background()
 
 	// Create module with nested dependencies
 	module := &pb.ModuleProto{
@@ -599,13 +568,13 @@ func TestModuleWithDependencies(t *testing.T) {
 		},
 	}
 
-	err := storage.UpsertModule(ctx, module)
+	err := storage.UpsertModule(module)
 	if err != nil {
 		t.Fatalf("UpsertModule failed: %v", err)
 	}
 
 	// Retrieve and verify nested structure
-	retrieved, err := storage.GetModule(ctx, module.GetName(), module.GetVersion())
+	retrieved, err := storage.GetModule(module.GetName(), module.GetVersion())
 	if err != nil {
 		t.Fatalf("GetModule failed: %v", err)
 	}
@@ -628,8 +597,6 @@ func TestDeleteModule_WithDependencies(t *testing.T) {
 	storage, cleanup := setupTestStorage(t)
 	defer cleanup()
 
-	ctx := context.Background()
-
 	moduleName := "github.com/test/module"
 
 	// Insert module
@@ -640,7 +607,7 @@ func TestDeleteModule_WithDependencies(t *testing.T) {
 		TimestampUnixNano: time.Now().UnixNano(),
 	}
 
-	err := storage.UpsertModule(ctx, module)
+	err := storage.UpsertModule(module)
 	if err != nil {
 		t.Fatalf("UpsertModule failed: %v", err)
 	}
@@ -655,19 +622,19 @@ func TestDeleteModule_WithDependencies(t *testing.T) {
 		},
 	}
 
-	err = storage.UpsertDependencies(ctx, moduleName, deps)
+	err = storage.UpsertDependencies(moduleName, deps)
 	if err != nil {
 		t.Fatalf("UpsertDependencies failed: %v", err)
 	}
 
 	// Delete module (should also delete dependencies)
-	err = storage.DeleteModule(ctx, moduleName, module.GetVersion())
+	err = storage.DeleteModule(moduleName, module.GetVersion())
 	if err != nil {
 		t.Fatalf("DeleteModule failed: %v", err)
 	}
 
 	// Verify dependencies are also deleted
-	_, err = storage.GetDependenciesByModule(ctx, moduleName)
+	_, err = storage.GetDependenciesByModule(moduleName)
 	if err == nil {
 		t.Error("Expected error when getting dependencies for deleted module")
 	}
@@ -677,10 +644,8 @@ func TestEmptyDatabase(t *testing.T) {
 	storage, cleanup := setupTestStorage(t)
 	defer cleanup()
 
-	ctx := context.Background()
-
 	// Test operations on empty database
-	modules, err := storage.ListModules(ctx)
+	modules, err := storage.ListModules()
 	if err != nil {
 		t.Fatalf("ListModules failed on empty database: %v", err)
 	}
@@ -689,7 +654,7 @@ func TestEmptyDatabase(t *testing.T) {
 		t.Errorf("Expected 0 modules in empty database, got %d", len(modules))
 	}
 
-	modules, err = storage.GetModuleByName(ctx, "nonexistent")
+	modules, err = storage.GetModuleByName("nonexistent")
 	if err != nil {
 		t.Fatalf("GetModuleByName failed on empty database: %v", err)
 	}

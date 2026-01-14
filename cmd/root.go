@@ -24,7 +24,7 @@ Usage:
 			return cmd.Help()
 		}
 
-		// Direct invocation acts as shorthand for install
+		// Direct invocation acts as shorthand for installation
 		return installer.Installer(cmd, args)
 	},
 }

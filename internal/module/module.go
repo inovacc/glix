@@ -28,6 +28,7 @@ type Module struct {
 	goListPackage []GoListPackage
 	Time          time.Time    `json:"time"`
 	Name          string       `json:"name"`
+	RootModule    string       `json:"root_module"` // The actual Go module path (e.g., github.com/sqlc-dev/sqlc)
 	Hash          string       `json:"hash"`
 	Version       string       `json:"version"`
 	Versions      []string     `json:"versions"`
@@ -81,11 +82,15 @@ func (m *Module) FetchModuleInfo(module string) error {
 		return err
 	}
 
-	// Get versions from upstream
-	lr, err := m.fetchModuleVersions(ctx, module)
+	// Get versions from upstream (this also resolves the root module)
+	result, err := m.fetchModuleVersions(ctx, module)
 	if err != nil {
 		return err
 	}
+
+	lr := result.ListResp
+	rootModule := result.RootModule
+	m.RootModule = rootModule // Store the root module for later use (e.g., go mod download)
 
 	// Download the module first to check if it's installable
 	if err := m.getModule(ctx, fmt.Sprintf("%s@latest", module)); err != nil {
@@ -93,11 +98,12 @@ func (m *Module) FetchModuleInfo(module string) error {
 	}
 
 	// Check if the resolved module is installable (has package main)
-	// If not, trigger smart detection to find CLI paths
+	// If not, trigger smart detection to find CLI paths using the ROOT module
 	if !m.hasPackageMain(ctx, module) {
 		fmt.Printf("Module %q found but is not installable (no main package), searching for CLIs...\n", module)
 
-		discovered, found, discErr := m.DiscoverCLIPaths(ctx, module)
+		// Use root module for discovery, not the user-provided path
+		discovered, found, discErr := m.DiscoverCLIPaths(ctx, rootModule)
 		if discErr == nil && found && len(discovered) > 0 {
 			// Auto-select the first discovered CLI
 			selectedCLI := discovered[0]
@@ -175,8 +181,12 @@ func (m *Module) InstallModule(ctx context.Context) error {
 
 // getModuleSourceDir downloads the module and returns its source directory
 func (m *Module) getModuleSourceDir(ctx context.Context) (string, error) {
-	// Use go mod download to get the module
-	cmd := exec.CommandContext(ctx, m.goBinPath, "mod", "download", "-json", fmt.Sprintf("%s@%s", m.Name, m.Version))
+	// Use go mod download to get the module (must use root module path, not package path)
+	modulePath := m.RootModule
+	if modulePath == "" {
+		modulePath = m.Name // Fallback for backwards compatibility
+	}
+	cmd := exec.CommandContext(ctx, m.goBinPath, "mod", "download", "-json", fmt.Sprintf("%s@%s", modulePath, m.Version))
 
 	var out bytes.Buffer
 
@@ -293,18 +303,18 @@ func (m *Module) dependency(module string) (*Dependency, error) {
 
 	name, suffix := m.splitModuleVersion(module)
 
-	lr, err := m.fetchModuleVersions(ctx, name)
+	result, err := m.fetchModuleVersions(ctx, name)
 	if err != nil {
 		return nil, err
 	}
 
-	version := m.pickVersion(suffix, lr.Versions)
+	version := m.pickVersion(suffix, result.ListResp.Versions)
 
 	return &Dependency{
 		Name:     name,
 		Hash:     m.hashModule(fmt.Sprintf("%s@%s", name, version)),
 		Version:  version,
-		Versions: lr.Versions,
+		Versions: result.ListResp.Versions,
 	}, nil
 }
 
@@ -346,7 +356,13 @@ func (m *Module) tryFetchVersions(ctx context.Context, module string) (*ListResp
 	return nil, fmt.Errorf("no versions found")
 }
 
-func (m *Module) fetchModuleVersions(ctx context.Context, module string) (*ListResp, error) {
+// fetchModuleVersionsResult contains both the version info and the resolved root module path
+type fetchModuleVersionsResult struct {
+	ListResp   *ListResp
+	RootModule string
+}
+
+func (m *Module) fetchModuleVersions(ctx context.Context, module string) (*fetchModuleVersionsResult, error) {
 	original := module
 	attempts := 0
 
@@ -375,13 +391,13 @@ func (m *Module) fetchModuleVersions(ctx context.Context, module string) (*ListR
 					return semver.Compare(lr.Versions[i], lr.Versions[j]) > 0
 				})
 
-				return &lr, nil
+				return &fetchModuleVersionsResult{ListResp: &lr, RootModule: module}, nil
 			}
 
 			// For modules without tags, use pseudo-version if available
 			if lr.Version != "" {
 				lr.Versions = []string{lr.Version}
-				return &lr, nil
+				return &fetchModuleVersionsResult{ListResp: &lr, RootModule: module}, nil
 			}
 		}
 
@@ -414,7 +430,11 @@ func (m *Module) fetchModuleVersions(ctx context.Context, module string) (*ListR
 
 		// Try first discovered path to get versions
 		if len(discovered) > 0 {
-			return m.tryFetchVersions(ctx, discovered[0])
+			lr, err := m.tryFetchVersions(ctx, discovered[0])
+			if err != nil {
+				return nil, err
+			}
+			return &fetchModuleVersionsResult{ListResp: lr, RootModule: module}, nil
 		}
 	}
 
@@ -484,7 +504,7 @@ func (m *Module) extractDependencies(ctx context.Context, self string) ([]Depend
 
 func (m *Module) getTimeout() time.Duration {
 	if m.timeout == 0 {
-		return 10 * time.Second
+		return 5 * time.Minute // Increased timeout for large modules
 	}
 
 	return m.timeout

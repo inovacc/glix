@@ -13,7 +13,7 @@ import (
 )
 
 func Installer(cmd *cobra.Command, args []string) error {
-	db, err := database.NewStorage(cmd.Context(), module.GetDatabaseDirectory())
+	db, err := database.NewStorage(module.GetDatabaseDirectory())
 	if err != nil {
 		return err
 	}
@@ -111,7 +111,7 @@ func Remover(cmd *cobra.Command, args []string) error {
 	}
 
 	// Remove from database
-	db, err := database.NewStorage(cmd.Context(), module.GetDatabaseDirectory())
+	db, err := database.NewStorage(module.GetDatabaseDirectory())
 	if err != nil {
 		return err
 	}

@@ -2,11 +2,12 @@ package monitor
 
 import (
 	"github.com/inovacc/glix/internal/database"
+	"github.com/inovacc/glix/internal/module"
 	"github.com/spf13/cobra"
 )
 
-func Monitor(cmd *cobra.Command, args []string) error {
-	db, err := database.NewStorage(cmd.Context())
+func Monitor(cmd *cobra.Command, _ []string) error {
+	db, err := database.NewStorage(module.GetDatabaseDirectory())
 	if err != nil {
 		return err
 	}

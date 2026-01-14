@@ -16,9 +16,7 @@ Example:
   glix remove github.com/inovacc/twig
   glix remove twig`,
 	Args: cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		return installer.Remover(cmd, args)
-	},
+	RunE: installer.Remover,
 }
 
 func init() {
