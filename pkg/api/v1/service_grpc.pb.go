@@ -20,14 +20,11 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	GlixService_Install_FullMethodName         = "/glix.v1.GlixService/Install"
-	GlixService_InstallStream_FullMethodName   = "/glix.v1.GlixService/InstallStream"
-	GlixService_Remove_FullMethodName          = "/glix.v1.GlixService/Remove"
-	GlixService_Update_FullMethodName          = "/glix.v1.GlixService/Update"
-	GlixService_UpdateStream_FullMethodName    = "/glix.v1.GlixService/UpdateStream"
+	GlixService_StoreModule_FullMethodName     = "/glix.v1.GlixService/StoreModule"
 	GlixService_ListModules_FullMethodName     = "/glix.v1.GlixService/ListModules"
 	GlixService_GetModule_FullMethodName       = "/glix.v1.GlixService/GetModule"
 	GlixService_GetDependencies_FullMethodName = "/glix.v1.GlixService/GetDependencies"
+	GlixService_Remove_FullMethodName          = "/glix.v1.GlixService/Remove"
 	GlixService_GetStatus_FullMethodName       = "/glix.v1.GlixService/GetStatus"
 	GlixService_Ping_FullMethodName            = "/glix.v1.GlixService/Ping"
 )
@@ -36,16 +33,14 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type GlixServiceClient interface {
-	// Module operations
-	Install(ctx context.Context, in *InstallRequest, opts ...grpc.CallOption) (*InstallResponse, error)
-	InstallStream(ctx context.Context, in *InstallRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[InstallProgress], error)
-	Remove(ctx context.Context, in *RemoveRequest, opts ...grpc.CallOption) (*RemoveResponse, error)
-	Update(ctx context.Context, in *UpdateRequest, opts ...grpc.CallOption) (*UpdateResponse, error)
-	UpdateStream(ctx context.Context, in *UpdateRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[InstallProgress], error)
+	// Storage operations (called by CLI after local installation)
+	StoreModule(ctx context.Context, in *StoreModuleRequest, opts ...grpc.CallOption) (*StoreModuleResponse, error)
 	// Query operations
 	ListModules(ctx context.Context, in *ListModulesRequest, opts ...grpc.CallOption) (*ListModulesResponse, error)
 	GetModule(ctx context.Context, in *GetModuleRequest, opts ...grpc.CallOption) (*GetModuleResponse, error)
 	GetDependencies(ctx context.Context, in *GetModuleRequest, opts ...grpc.CallOption) (*GetDependenciesResponse, error)
+	// Module management (database only)
+	Remove(ctx context.Context, in *RemoveRequest, opts ...grpc.CallOption) (*RemoveResponse, error)
 	// Server management
 	GetStatus(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*ServerStatus, error)
 	Ping(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error)
@@ -59,73 +54,15 @@ func NewGlixServiceClient(cc grpc.ClientConnInterface) GlixServiceClient {
 	return &glixServiceClient{cc}
 }
 
-func (c *glixServiceClient) Install(ctx context.Context, in *InstallRequest, opts ...grpc.CallOption) (*InstallResponse, error) {
+func (c *glixServiceClient) StoreModule(ctx context.Context, in *StoreModuleRequest, opts ...grpc.CallOption) (*StoreModuleResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(InstallResponse)
-	err := c.cc.Invoke(ctx, GlixService_Install_FullMethodName, in, out, cOpts...)
+	out := new(StoreModuleResponse)
+	err := c.cc.Invoke(ctx, GlixService_StoreModule_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
-
-func (c *glixServiceClient) InstallStream(ctx context.Context, in *InstallRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[InstallProgress], error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &GlixService_ServiceDesc.Streams[0], GlixService_InstallStream_FullMethodName, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	x := &grpc.GenericClientStream[InstallRequest, InstallProgress]{ClientStream: stream}
-	if err := x.ClientStream.SendMsg(in); err != nil {
-		return nil, err
-	}
-	if err := x.ClientStream.CloseSend(); err != nil {
-		return nil, err
-	}
-	return x, nil
-}
-
-// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type GlixService_InstallStreamClient = grpc.ServerStreamingClient[InstallProgress]
-
-func (c *glixServiceClient) Remove(ctx context.Context, in *RemoveRequest, opts ...grpc.CallOption) (*RemoveResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(RemoveResponse)
-	err := c.cc.Invoke(ctx, GlixService_Remove_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *glixServiceClient) Update(ctx context.Context, in *UpdateRequest, opts ...grpc.CallOption) (*UpdateResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(UpdateResponse)
-	err := c.cc.Invoke(ctx, GlixService_Update_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *glixServiceClient) UpdateStream(ctx context.Context, in *UpdateRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[InstallProgress], error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &GlixService_ServiceDesc.Streams[1], GlixService_UpdateStream_FullMethodName, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	x := &grpc.GenericClientStream[UpdateRequest, InstallProgress]{ClientStream: stream}
-	if err := x.ClientStream.SendMsg(in); err != nil {
-		return nil, err
-	}
-	if err := x.ClientStream.CloseSend(); err != nil {
-		return nil, err
-	}
-	return x, nil
-}
-
-// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type GlixService_UpdateStreamClient = grpc.ServerStreamingClient[InstallProgress]
 
 func (c *glixServiceClient) ListModules(ctx context.Context, in *ListModulesRequest, opts ...grpc.CallOption) (*ListModulesResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
@@ -157,6 +94,16 @@ func (c *glixServiceClient) GetDependencies(ctx context.Context, in *GetModuleRe
 	return out, nil
 }
 
+func (c *glixServiceClient) Remove(ctx context.Context, in *RemoveRequest, opts ...grpc.CallOption) (*RemoveResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RemoveResponse)
+	err := c.cc.Invoke(ctx, GlixService_Remove_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *glixServiceClient) GetStatus(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*ServerStatus, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ServerStatus)
@@ -181,16 +128,14 @@ func (c *glixServiceClient) Ping(ctx context.Context, in *emptypb.Empty, opts ..
 // All implementations must embed UnimplementedGlixServiceServer
 // for forward compatibility.
 type GlixServiceServer interface {
-	// Module operations
-	Install(context.Context, *InstallRequest) (*InstallResponse, error)
-	InstallStream(*InstallRequest, grpc.ServerStreamingServer[InstallProgress]) error
-	Remove(context.Context, *RemoveRequest) (*RemoveResponse, error)
-	Update(context.Context, *UpdateRequest) (*UpdateResponse, error)
-	UpdateStream(*UpdateRequest, grpc.ServerStreamingServer[InstallProgress]) error
+	// Storage operations (called by CLI after local installation)
+	StoreModule(context.Context, *StoreModuleRequest) (*StoreModuleResponse, error)
 	// Query operations
 	ListModules(context.Context, *ListModulesRequest) (*ListModulesResponse, error)
 	GetModule(context.Context, *GetModuleRequest) (*GetModuleResponse, error)
 	GetDependencies(context.Context, *GetModuleRequest) (*GetDependenciesResponse, error)
+	// Module management (database only)
+	Remove(context.Context, *RemoveRequest) (*RemoveResponse, error)
 	// Server management
 	GetStatus(context.Context, *emptypb.Empty) (*ServerStatus, error)
 	Ping(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
@@ -204,20 +149,8 @@ type GlixServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedGlixServiceServer struct{}
 
-func (UnimplementedGlixServiceServer) Install(context.Context, *InstallRequest) (*InstallResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method Install not implemented")
-}
-func (UnimplementedGlixServiceServer) InstallStream(*InstallRequest, grpc.ServerStreamingServer[InstallProgress]) error {
-	return status.Error(codes.Unimplemented, "method InstallStream not implemented")
-}
-func (UnimplementedGlixServiceServer) Remove(context.Context, *RemoveRequest) (*RemoveResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method Remove not implemented")
-}
-func (UnimplementedGlixServiceServer) Update(context.Context, *UpdateRequest) (*UpdateResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method Update not implemented")
-}
-func (UnimplementedGlixServiceServer) UpdateStream(*UpdateRequest, grpc.ServerStreamingServer[InstallProgress]) error {
-	return status.Error(codes.Unimplemented, "method UpdateStream not implemented")
+func (UnimplementedGlixServiceServer) StoreModule(context.Context, *StoreModuleRequest) (*StoreModuleResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method StoreModule not implemented")
 }
 func (UnimplementedGlixServiceServer) ListModules(context.Context, *ListModulesRequest) (*ListModulesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListModules not implemented")
@@ -227,6 +160,9 @@ func (UnimplementedGlixServiceServer) GetModule(context.Context, *GetModuleReque
 }
 func (UnimplementedGlixServiceServer) GetDependencies(context.Context, *GetModuleRequest) (*GetDependenciesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetDependencies not implemented")
+}
+func (UnimplementedGlixServiceServer) Remove(context.Context, *RemoveRequest) (*RemoveResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Remove not implemented")
 }
 func (UnimplementedGlixServiceServer) GetStatus(context.Context, *emptypb.Empty) (*ServerStatus, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetStatus not implemented")
@@ -255,81 +191,23 @@ func RegisterGlixServiceServer(s grpc.ServiceRegistrar, srv GlixServiceServer) {
 	s.RegisterService(&GlixService_ServiceDesc, srv)
 }
 
-func _GlixService_Install_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(InstallRequest)
+func _GlixService_StoreModule_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StoreModuleRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(GlixServiceServer).Install(ctx, in)
+		return srv.(GlixServiceServer).StoreModule(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: GlixService_Install_FullMethodName,
+		FullMethod: GlixService_StoreModule_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(GlixServiceServer).Install(ctx, req.(*InstallRequest))
+		return srv.(GlixServiceServer).StoreModule(ctx, req.(*StoreModuleRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
-
-func _GlixService_InstallStream_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(InstallRequest)
-	if err := stream.RecvMsg(m); err != nil {
-		return err
-	}
-	return srv.(GlixServiceServer).InstallStream(m, &grpc.GenericServerStream[InstallRequest, InstallProgress]{ServerStream: stream})
-}
-
-// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type GlixService_InstallStreamServer = grpc.ServerStreamingServer[InstallProgress]
-
-func _GlixService_Remove_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(RemoveRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(GlixServiceServer).Remove(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: GlixService_Remove_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(GlixServiceServer).Remove(ctx, req.(*RemoveRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _GlixService_Update_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(UpdateRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(GlixServiceServer).Update(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: GlixService_Update_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(GlixServiceServer).Update(ctx, req.(*UpdateRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _GlixService_UpdateStream_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(UpdateRequest)
-	if err := stream.RecvMsg(m); err != nil {
-		return err
-	}
-	return srv.(GlixServiceServer).UpdateStream(m, &grpc.GenericServerStream[UpdateRequest, InstallProgress]{ServerStream: stream})
-}
-
-// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type GlixService_UpdateStreamServer = grpc.ServerStreamingServer[InstallProgress]
 
 func _GlixService_ListModules_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListModulesRequest)
@@ -385,6 +263,24 @@ func _GlixService_GetDependencies_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _GlixService_Remove_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoveRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GlixServiceServer).Remove(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GlixService_Remove_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GlixServiceServer).Remove(ctx, req.(*RemoveRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _GlixService_GetStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
@@ -429,16 +325,8 @@ var GlixService_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*GlixServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "Install",
-			Handler:    _GlixService_Install_Handler,
-		},
-		{
-			MethodName: "Remove",
-			Handler:    _GlixService_Remove_Handler,
-		},
-		{
-			MethodName: "Update",
-			Handler:    _GlixService_Update_Handler,
+			MethodName: "StoreModule",
+			Handler:    _GlixService_StoreModule_Handler,
 		},
 		{
 			MethodName: "ListModules",
@@ -453,6 +341,10 @@ var GlixService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _GlixService_GetDependencies_Handler,
 		},
 		{
+			MethodName: "Remove",
+			Handler:    _GlixService_Remove_Handler,
+		},
+		{
 			MethodName: "GetStatus",
 			Handler:    _GlixService_GetStatus_Handler,
 		},
@@ -461,17 +353,6 @@ var GlixService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _GlixService_Ping_Handler,
 		},
 	},
-	Streams: []grpc.StreamDesc{
-		{
-			StreamName:    "InstallStream",
-			Handler:       _GlixService_InstallStream_Handler,
-			ServerStreams: true,
-		},
-		{
-			StreamName:    "UpdateStream",
-			Handler:       _GlixService_UpdateStream_Handler,
-			ServerStreams: true,
-		},
-	},
+	Streams:  []grpc.StreamDesc{},
 	Metadata: "proto/v1/service.proto",
 }

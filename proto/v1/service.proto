@@ -27,6 +27,17 @@ message ServerStatus {
 
 // ========== Module Operations ==========
 
+// StoreModuleRequest is used by the CLI to store module info after local installation
+message StoreModuleRequest {
+  database.ModuleProto module = 1;
+  database.DependenciesProto dependencies = 2;
+}
+
+message StoreModuleResponse {
+  bool success = 1;
+  string error_message = 2;
+}
+
 message InstallRequest {
   string module_path = 1;         // e.g., github.com/user/repo
   string version = 2;             // Optional: specific version or "latest"
@@ -117,17 +128,16 @@ message InstallProgress {
 // ========== Service Definition ==========
 
 service GlixService {
-  // Module operations
-  rpc Install(InstallRequest) returns (InstallResponse);
-  rpc InstallStream(InstallRequest) returns (stream InstallProgress);
-  rpc Remove(RemoveRequest) returns (RemoveResponse);
-  rpc Update(UpdateRequest) returns (UpdateResponse);
-  rpc UpdateStream(UpdateRequest) returns (stream InstallProgress);
+  // Storage operations (called by CLI after local installation)
+  rpc StoreModule(StoreModuleRequest) returns (StoreModuleResponse);
 
   // Query operations
   rpc ListModules(ListModulesRequest) returns (ListModulesResponse);
   rpc GetModule(GetModuleRequest) returns (GetModuleResponse);
   rpc GetDependencies(GetModuleRequest) returns (GetDependenciesResponse);
+
+  // Module management (database only)
+  rpc Remove(RemoveRequest) returns (RemoveResponse);
 
   // Server management
   rpc GetStatus(google.protobuf.Empty) returns (ServerStatus);

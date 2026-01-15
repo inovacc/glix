@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/inovacc/glix/internal/autoupdate"
 	"github.com/inovacc/glix/internal/database"
 	"github.com/inovacc/glix/internal/module"
 	pb "github.com/inovacc/glix/pkg/api/v1"
@@ -41,6 +42,7 @@ type Server struct {
 	lastActivity time.Time
 	logger       *slog.Logger
 	cancelIdle   context.CancelFunc
+	autoUpdater  *autoupdate.Scheduler
 
 	mu      sync.RWMutex
 	running bool
@@ -83,9 +85,10 @@ func New(cfg Config) (*Server, error) {
 	}
 
 	return &Server{
-		config: cfg,
-		db:     db,
-		logger: cfg.Logger,
+		config:      cfg,
+		db:          db,
+		logger:      cfg.Logger,
+		autoUpdater: autoupdate.NewScheduler(cfg.Logger),
 	}, nil
 }
 
@@ -152,6 +155,11 @@ func (s *Server) Start(ctx context.Context) error {
 		go s.monitorIdle(idleCtx)
 	}
 
+	// Start auto-update scheduler
+	if s.autoUpdater != nil {
+		s.autoUpdater.Start(ctx)
+	}
+
 	// Serve requests
 	if err := s.grpcSrv.Serve(listener); err != nil {
 		return fmt.Errorf("server error: %w", err)
@@ -204,6 +212,11 @@ func (s *Server) Stop() {
 	}
 
 	s.logger.Info("stopping gRPC server")
+
+	// Stop auto-update scheduler
+	if s.autoUpdater != nil {
+		s.autoUpdater.Stop()
+	}
 
 	if s.grpcSrv != nil {
 		s.grpcSrv.GracefulStop()

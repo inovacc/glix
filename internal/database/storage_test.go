@@ -142,7 +142,7 @@ func TestGetModule_NotFound(t *testing.T) {
 		t.Fatal("Expected error for non-existent module")
 	}
 
-	expectedError := "module not found: nonexistent@v1.0.0"
+	expectedError := "module not found: nonexistent"
 	if err.Error() != expectedError {
 		t.Errorf("Expected error '%s', got '%s'", expectedError, err.Error())
 	}
@@ -154,7 +154,7 @@ func TestGetModuleByName(t *testing.T) {
 
 	moduleName := "github.com/test/module"
 
-	// Insert multiple versions
+	// Insert multiple versions - only the latest should be stored
 	versions := []string{"v1.0.0", "v1.1.0", "v1.2.0"}
 	for i, version := range versions {
 		module := &pb.ModuleProto{
@@ -170,21 +170,19 @@ func TestGetModuleByName(t *testing.T) {
 		}
 	}
 
-	// Retrieve all versions
+	// Retrieve module - should return only 1 (the latest version)
 	modules, err := storage.GetModuleByName(moduleName)
 	if err != nil {
 		t.Fatalf("GetModuleByName failed: %v", err)
 	}
 
-	if len(modules) != 3 {
-		t.Errorf("Expected 3 modules, got %d", len(modules))
+	if len(modules) != 1 {
+		t.Errorf("Expected 1 module, got %d", len(modules))
 	}
 
-	// Verify sorted by timestamp descending (most recent first)
-	for i := 0; i < len(modules)-1; i++ {
-		if modules[i].GetTimestampUnixNano() < modules[i+1].GetTimestampUnixNano() {
-			t.Error("Modules not sorted by timestamp descending")
-		}
+	// Verify it's the latest version
+	if modules[0].GetVersion() != "v1.2.0" {
+		t.Errorf("Expected latest version v1.2.0, got %s", modules[0].GetVersion())
 	}
 }
 
@@ -409,19 +407,19 @@ func TestCountDependencies(t *testing.T) {
 	}
 }
 
-func TestNameIndex(t *testing.T) {
+func TestModuleVersionUpdate(t *testing.T) {
 	storage, cleanup := setupTestStorage(t)
 	defer cleanup()
 
 	moduleName := "github.com/test/module"
 
-	// Insert multiple versions
+	// Insert multiple versions - only the latest should be stored
 	versions := []string{"v1.0.0", "v1.1.0", "v1.2.0"}
 	for i, version := range versions {
 		module := &pb.ModuleProto{
 			Name:              moduleName,
 			Version:           version,
-			Hash:              "hash",
+			Hash:              "hash" + version,
 			TimestampUnixNano: time.Now().UnixNano() + int64(i*1000000),
 		}
 
@@ -431,30 +429,30 @@ func TestNameIndex(t *testing.T) {
 		}
 	}
 
-	// Get by name should return all versions
+	// Get by name should return only 1 module (latest version)
 	modules, err := storage.GetModuleByName(moduleName)
 	if err != nil {
 		t.Fatalf("GetModuleByName failed: %v", err)
 	}
 
-	if len(modules) != 3 {
-		t.Errorf("Expected 3 versions, got %d", len(modules))
+	if len(modules) != 1 {
+		t.Errorf("Expected 1 module, got %d", len(modules))
 	}
 
-	// Delete one version
-	err = storage.DeleteModule(moduleName, "v1.0.0")
+	if modules[0].GetVersion() != "v1.2.0" {
+		t.Errorf("Expected latest version v1.2.0, got %s", modules[0].GetVersion())
+	}
+
+	// Delete the module
+	err = storage.DeleteModule(moduleName, "")
 	if err != nil {
 		t.Fatalf("DeleteModule failed: %v", err)
 	}
 
-	// Should now return 2 versions
-	modules, err = storage.GetModuleByName(moduleName)
-	if err != nil {
-		t.Fatalf("GetModuleByName failed after delete: %v", err)
-	}
-
-	if len(modules) != 2 {
-		t.Errorf("Expected 2 versions after delete, got %d", len(modules))
+	// Should now return error (not found)
+	_, err = storage.GetModuleByName(moduleName)
+	if err == nil {
+		t.Error("Expected error for deleted module, got nil")
 	}
 }
 
@@ -657,12 +655,9 @@ func TestEmptyDatabase(t *testing.T) {
 		t.Errorf("Expected 0 modules in empty database, got %d", len(modules))
 	}
 
-	modules, err = storage.GetModuleByName("nonexistent")
-	if err != nil {
-		t.Fatalf("GetModuleByName failed on empty database: %v", err)
-	}
-
-	if len(modules) != 0 {
-		t.Errorf("Expected 0 modules for nonexistent name, got %d", len(modules))
+	// GetModuleByName should return error for nonexistent module
+	_, err = storage.GetModuleByName("nonexistent")
+	if err == nil {
+		t.Error("Expected error for nonexistent module, got nil")
 	}
 }

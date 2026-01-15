@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -20,19 +19,23 @@ import (
 
 const dummyModuleName = "dummy"
 
+// ProgressHandler is called to report progress during module operations
+type ProgressHandler func(phase, message string)
+
 type Module struct {
-	ctx           context.Context
-	goBinPath     string
-	workingDir    string
-	timeout       time.Duration
-	goListPackage []GoListPackage
-	Time          time.Time    `json:"time"`
-	Name          string       `json:"name"`
-	RootModule    string       `json:"root_module"` // The actual Go module path (e.g., github.com/sqlc-dev/sqlc)
-	Hash          string       `json:"hash"`
-	Version       string       `json:"version"`
-	Versions      []string     `json:"versions"`
-	Dependencies  []Dependency `json:"dependencies"`
+	ctx             context.Context
+	goBinPath       string
+	workingDir      string
+	timeout         time.Duration
+	goListPackage   []GoListPackage
+	progressHandler ProgressHandler
+	Time            time.Time    `json:"time"`
+	Name            string       `json:"name"`
+	RootModule      string       `json:"root_module"` // The actual Go module path (e.g., github.com/sqlc-dev/sqlc)
+	Hash            string       `json:"hash"`
+	Version         string       `json:"version"`
+	Versions        []string     `json:"versions"`
+	Dependencies    []Dependency `json:"dependencies"`
 }
 
 type Dependency struct {
@@ -68,6 +71,18 @@ func NewModule(ctx context.Context, goBinPath, workingDir string) (*Module, erro
 	}, nil
 }
 
+// SetProgressHandler sets a callback for progress updates
+func (m *Module) SetProgressHandler(handler ProgressHandler) {
+	m.progressHandler = handler
+}
+
+// progress reports progress if a handler is set
+func (m *Module) progress(phase, message string) {
+	if m.progressHandler != nil {
+		m.progressHandler(phase, message)
+	}
+}
+
 func (m *Module) FetchModuleInfo(module string) error {
 	module = m.normalizeModulePath(module)
 
@@ -78,11 +93,13 @@ func (m *Module) FetchModuleInfo(module string) error {
 	m.Name = module
 
 	// Setup dummy mod early for discovery
+	m.progress("init", "Initializing workspace...")
 	if err := m.setupTempModule(ctx); err != nil {
 		return err
 	}
 
 	// Get versions from upstream (this also resolves the root module)
+	m.progress("versions", "Fetching available versions...")
 	result, err := m.fetchModuleVersions(ctx, module)
 	if err != nil {
 		return err
@@ -93,13 +110,16 @@ func (m *Module) FetchModuleInfo(module string) error {
 	m.RootModule = rootModule // Store the root module for later use (e.g., go mod download)
 
 	// Download the module first to check if it's installable
+	m.progress("download", "Downloading module...")
 	if err := m.getModule(ctx, fmt.Sprintf("%s@latest", module)); err != nil {
 		return fmt.Errorf("failed to download module: %w", err)
 	}
 
 	// Check if the resolved module is installable (has package main)
 	// If not, trigger smart detection to find CLI paths using the ROOT module
+	m.progress("check", "Checking if module is installable...")
 	if !m.hasPackageMain(ctx, module) {
+		m.progress("discover", "Searching for CLI binaries...")
 		fmt.Printf("Module %q found but is not installable (no main package), searching for CLIs...\n", module)
 
 		// Use root module for discovery, not the user-provided path
@@ -130,53 +150,21 @@ func (m *Module) FetchModuleInfo(module string) error {
 	m.Time = time.Now()
 	m.Hash = m.hashModule(fmt.Sprintf("%s@%s", module, version))
 
-	// Install target module in dummy with specific version if different from latest
+	// Install the target module in dummy with a specific version if different from the latest
 	// (we already downloaded @latest above for the installability check)
 	if version != "latest" && version != lr.Version {
+		m.progress("download", fmt.Sprintf("Downloading %s...", version))
 		if err := m.getModule(ctx, fmt.Sprintf("%s@%s", module, version)); err != nil {
 			return err
 		}
 	}
 
 	// Extract dependencies
+	m.progress("deps", "Resolving dependencies...")
 	m.Dependencies, err = m.extractDependencies(ctx, module)
+	m.progress("done", "Module info fetched successfully")
 
 	return err
-}
-
-func (m *Module) InstallModule(ctx context.Context) error {
-	// Download the module to check for .goreleaser.yaml
-	moduleDir, err := m.getModuleSourceDir(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get module source: %w", err)
-	}
-
-	// Check if the module has a .goreleaser.yaml file
-	hasGR, configPath, err := m.hasGoReleaserConfig(ctx, moduleDir)
-	if err != nil {
-		return fmt.Errorf("failed to check for goreleaser config: %w", err)
-	}
-
-	if hasGR {
-		fmt.Printf("Found GoReleaser config: %s\n", filepath.Base(configPath))
-		return m.installViaGoReleaser(ctx, moduleDir)
-	}
-
-	// Standard go install
-	cmd := exec.CommandContext(ctx, m.goBinPath, "install", fmt.Sprintf("%s@%s", m.Name, m.Version))
-
-	gopath := os.Getenv("GOPATH")
-	if gopath == "" {
-		gopath = filepath.Join(os.Getenv("HOME"), "go")
-	}
-
-	cmd.Env = append(os.Environ(), fmt.Sprintf("GOBIN=%s", filepath.Join(gopath, "bin")))
-
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("go install failed: %w", err)
-	}
-
-	return nil
 }
 
 // getModuleSourceDir downloads the module and returns its source directory

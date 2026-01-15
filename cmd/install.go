@@ -2,9 +2,13 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/inovacc/glix/internal/client"
+	"github.com/inovacc/glix/internal/module"
 	"github.com/spf13/cobra"
 )
 
@@ -18,9 +22,6 @@ The module can be specified as a full import path or a GitHub URL.
 glix will automatically detect CLI binaries in the repository if the
 root is not installable.
 
-The installation uses a gRPC client that connects to an on-demand
-server (starts automatically if not running).
-
 Examples:
   glix install github.com/inovacc/twig
   glix install https://github.com/inovacc/twig
@@ -30,27 +31,15 @@ Examples:
 	RunE: runInstall,
 }
 
-var installForce bool
-
 func init() {
 	rootCmd.AddCommand(installCmd)
-
-	installCmd.Flags().BoolVarP(&installForce, "force", "f", false, "Force installation even if already installed")
 }
 
 func runInstall(cmd *cobra.Command, args []string) error {
+	ctx := cmd.Context()
+
 	// Parse module path and version
 	modulePath, version := parseModulePath(args[0])
-
-	// Use the gRPC client (on-demand server starts automatically)
-	cfg := client.DefaultDiscoveryConfig()
-	grpcClient, err := client.GetClient(cmd.Context(), cfg)
-	if err != nil {
-		return fmt.Errorf("failed to connect to gRPC server: %w", err)
-	}
-	defer func() {
-		_ = grpcClient.Close()
-	}()
 
 	cmd.Printf("Installing module: %s", modulePath)
 	if version != "" {
@@ -58,7 +47,55 @@ func runInstall(cmd *cobra.Command, args []string) error {
 	}
 	cmd.Println()
 
-	// Output handler for streaming
+	// Connect to server first (starts on-demand server if needed)
+	cfg := client.DefaultDiscoveryConfig()
+	grpcClient, err := client.GetClient(ctx, cfg)
+	if err != nil {
+		return fmt.Errorf("failed to connect to server: %w", err)
+	}
+	defer func() {
+		_ = grpcClient.Close()
+	}()
+
+	// Create a unique working directory for this install
+	cacheDir, err := module.GetApplicationCacheDirectory()
+	if err != nil {
+		return fmt.Errorf("failed to get cache directory: %w", err)
+	}
+
+	workDir := filepath.Join(cacheDir, fmt.Sprintf("install-%d", time.Now().UnixNano()))
+	if err := os.MkdirAll(workDir, 0755); err != nil {
+		return fmt.Errorf("failed to create working directory: %w", err)
+	}
+	defer func() {
+		_ = os.RemoveAll(workDir)
+	}()
+
+	// Create module instance
+	m, err := module.NewModule(ctx, "go", workDir)
+	if err != nil {
+		return fmt.Errorf("failed to create module: %w", err)
+	}
+
+	// Set progress handler to show what's happening
+	m.SetProgressHandler(func(phase, message string) {
+		cmd.Printf("[%s] %s\n", phase, message)
+	})
+
+	// Build full module path with version if specified
+	fullPath := modulePath
+	if version != "" && version != "latest" {
+		fullPath = fmt.Sprintf("%s@%s", modulePath, version)
+	}
+
+	// Fetch module info (CLI performs this locally)
+	if err := m.FetchModuleInfo(fullPath); err != nil {
+		return fmt.Errorf("failed to fetch module info: %w", err)
+	}
+
+	cmd.Printf("[install] Installing %s@%s...\n", m.Name, m.Version)
+
+	// Output handler for streaming installation output
 	outputHandler := func(stream string, line string) {
 		if stream == "stderr" {
 			_, _ = fmt.Fprintln(cmd.ErrOrStderr(), line)
@@ -67,28 +104,20 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Progress handler
-	progressHandler := func(phase, message string, percent int32) {
-		if percent >= 0 {
-			cmd.Printf("[%d%%] %s: %s\n", percent, phase, message)
-		} else {
-			cmd.Printf("[...] %s: %s\n", phase, message)
-		}
-	}
-
-	// Install with streaming
-	result, err := grpcClient.InstallWithStreaming(cmd.Context(), modulePath, version, installForce, outputHandler, progressHandler)
-	if err != nil {
+	// Install module locally with streaming output
+	if err := m.InstallModuleWithStreaming(ctx, outputHandler); err != nil {
 		return fmt.Errorf("installation failed: %w", err)
 	}
 
-	if !result.GetSuccess() {
-		return fmt.Errorf("installation failed: %s", result.GetErrorMessage())
+	// Store module info in database via server
+	cmd.Println("[store] Saving to database...")
+	if err := grpcClient.StoreModule(ctx, m); err != nil {
+		cmd.PrintErrf("Warning: failed to store module in database: %v\n", err)
 	}
 
 	cmd.Println()
-	cmd.Println("Module installed successfully:", result.GetModule().GetName())
-	cmd.Printf("Show report using: %s report %s\n", cmd.Root().Name(), result.GetModule().GetName())
+	cmd.Println("Module installed successfully:", m.Name)
+	cmd.Printf("Show report using: %s report %s\n", cmd.Root().Name(), m.Name)
 
 	return nil
 }

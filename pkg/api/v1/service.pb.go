@@ -65,7 +65,7 @@ func (x OutputLine_Stream) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use OutputLine_Stream.Descriptor instead.
 func (OutputLine_Stream) EnumDescriptor() ([]byte, []int) {
-	return file_proto_v1_service_proto_rawDescGZIP(), []int{13, 0}
+	return file_proto_v1_service_proto_rawDescGZIP(), []int{15, 0}
 }
 
 type ServerConfig struct {
@@ -220,6 +220,111 @@ func (x *ServerStatus) GetModuleCount() int64 {
 	return 0
 }
 
+// StoreModuleRequest is used by the CLI to store module info after local installation
+type StoreModuleRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Module        *ModuleProto           `protobuf:"bytes,1,opt,name=module,proto3" json:"module,omitempty"`
+	Dependencies  *DependenciesProto     `protobuf:"bytes,2,opt,name=dependencies,proto3" json:"dependencies,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StoreModuleRequest) Reset() {
+	*x = StoreModuleRequest{}
+	mi := &file_proto_v1_service_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StoreModuleRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StoreModuleRequest) ProtoMessage() {}
+
+func (x *StoreModuleRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_v1_service_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StoreModuleRequest.ProtoReflect.Descriptor instead.
+func (*StoreModuleRequest) Descriptor() ([]byte, []int) {
+	return file_proto_v1_service_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *StoreModuleRequest) GetModule() *ModuleProto {
+	if x != nil {
+		return x.Module
+	}
+	return nil
+}
+
+func (x *StoreModuleRequest) GetDependencies() *DependenciesProto {
+	if x != nil {
+		return x.Dependencies
+	}
+	return nil
+}
+
+type StoreModuleResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,2,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StoreModuleResponse) Reset() {
+	*x = StoreModuleResponse{}
+	mi := &file_proto_v1_service_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StoreModuleResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StoreModuleResponse) ProtoMessage() {}
+
+func (x *StoreModuleResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_v1_service_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StoreModuleResponse.ProtoReflect.Descriptor instead.
+func (*StoreModuleResponse) Descriptor() ([]byte, []int) {
+	return file_proto_v1_service_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *StoreModuleResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *StoreModuleResponse) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
 type InstallRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ModulePath    string                 `protobuf:"bytes,1,opt,name=module_path,json=modulePath,proto3" json:"module_path,omitempty"`        // e.g., github.com/user/repo
@@ -232,7 +337,7 @@ type InstallRequest struct {
 
 func (x *InstallRequest) Reset() {
 	*x = InstallRequest{}
-	mi := &file_proto_v1_service_proto_msgTypes[2]
+	mi := &file_proto_v1_service_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -244,7 +349,7 @@ func (x *InstallRequest) String() string {
 func (*InstallRequest) ProtoMessage() {}
 
 func (x *InstallRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_v1_service_proto_msgTypes[2]
+	mi := &file_proto_v1_service_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -257,7 +362,7 @@ func (x *InstallRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InstallRequest.ProtoReflect.Descriptor instead.
 func (*InstallRequest) Descriptor() ([]byte, []int) {
-	return file_proto_v1_service_proto_rawDescGZIP(), []int{2}
+	return file_proto_v1_service_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *InstallRequest) GetModulePath() string {
@@ -299,7 +404,7 @@ type InstallResponse struct {
 
 func (x *InstallResponse) Reset() {
 	*x = InstallResponse{}
-	mi := &file_proto_v1_service_proto_msgTypes[3]
+	mi := &file_proto_v1_service_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -311,7 +416,7 @@ func (x *InstallResponse) String() string {
 func (*InstallResponse) ProtoMessage() {}
 
 func (x *InstallResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_v1_service_proto_msgTypes[3]
+	mi := &file_proto_v1_service_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -324,7 +429,7 @@ func (x *InstallResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InstallResponse.ProtoReflect.Descriptor instead.
 func (*InstallResponse) Descriptor() ([]byte, []int) {
-	return file_proto_v1_service_proto_rawDescGZIP(), []int{3}
+	return file_proto_v1_service_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *InstallResponse) GetModule() *ModuleProto {
@@ -358,7 +463,7 @@ type RemoveRequest struct {
 
 func (x *RemoveRequest) Reset() {
 	*x = RemoveRequest{}
-	mi := &file_proto_v1_service_proto_msgTypes[4]
+	mi := &file_proto_v1_service_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -370,7 +475,7 @@ func (x *RemoveRequest) String() string {
 func (*RemoveRequest) ProtoMessage() {}
 
 func (x *RemoveRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_v1_service_proto_msgTypes[4]
+	mi := &file_proto_v1_service_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -383,7 +488,7 @@ func (x *RemoveRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveRequest.ProtoReflect.Descriptor instead.
 func (*RemoveRequest) Descriptor() ([]byte, []int) {
-	return file_proto_v1_service_proto_rawDescGZIP(), []int{4}
+	return file_proto_v1_service_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *RemoveRequest) GetModulePath() string {
@@ -410,7 +515,7 @@ type RemoveResponse struct {
 
 func (x *RemoveResponse) Reset() {
 	*x = RemoveResponse{}
-	mi := &file_proto_v1_service_proto_msgTypes[5]
+	mi := &file_proto_v1_service_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -422,7 +527,7 @@ func (x *RemoveResponse) String() string {
 func (*RemoveResponse) ProtoMessage() {}
 
 func (x *RemoveResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_v1_service_proto_msgTypes[5]
+	mi := &file_proto_v1_service_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -435,7 +540,7 @@ func (x *RemoveResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveResponse.ProtoReflect.Descriptor instead.
 func (*RemoveResponse) Descriptor() ([]byte, []int) {
-	return file_proto_v1_service_proto_rawDescGZIP(), []int{5}
+	return file_proto_v1_service_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *RemoveResponse) GetSuccess() bool {
@@ -463,7 +568,7 @@ type ListModulesRequest struct {
 
 func (x *ListModulesRequest) Reset() {
 	*x = ListModulesRequest{}
-	mi := &file_proto_v1_service_proto_msgTypes[6]
+	mi := &file_proto_v1_service_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -475,7 +580,7 @@ func (x *ListModulesRequest) String() string {
 func (*ListModulesRequest) ProtoMessage() {}
 
 func (x *ListModulesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_v1_service_proto_msgTypes[6]
+	mi := &file_proto_v1_service_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -488,7 +593,7 @@ func (x *ListModulesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListModulesRequest.ProtoReflect.Descriptor instead.
 func (*ListModulesRequest) Descriptor() ([]byte, []int) {
-	return file_proto_v1_service_proto_rawDescGZIP(), []int{6}
+	return file_proto_v1_service_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ListModulesRequest) GetLimit() int32 {
@@ -522,7 +627,7 @@ type ListModulesResponse struct {
 
 func (x *ListModulesResponse) Reset() {
 	*x = ListModulesResponse{}
-	mi := &file_proto_v1_service_proto_msgTypes[7]
+	mi := &file_proto_v1_service_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -534,7 +639,7 @@ func (x *ListModulesResponse) String() string {
 func (*ListModulesResponse) ProtoMessage() {}
 
 func (x *ListModulesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_v1_service_proto_msgTypes[7]
+	mi := &file_proto_v1_service_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -547,7 +652,7 @@ func (x *ListModulesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListModulesResponse.ProtoReflect.Descriptor instead.
 func (*ListModulesResponse) Descriptor() ([]byte, []int) {
-	return file_proto_v1_service_proto_rawDescGZIP(), []int{7}
+	return file_proto_v1_service_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ListModulesResponse) GetModules() []*ModuleProto {
@@ -574,7 +679,7 @@ type GetModuleRequest struct {
 
 func (x *GetModuleRequest) Reset() {
 	*x = GetModuleRequest{}
-	mi := &file_proto_v1_service_proto_msgTypes[8]
+	mi := &file_proto_v1_service_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -586,7 +691,7 @@ func (x *GetModuleRequest) String() string {
 func (*GetModuleRequest) ProtoMessage() {}
 
 func (x *GetModuleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_v1_service_proto_msgTypes[8]
+	mi := &file_proto_v1_service_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -599,7 +704,7 @@ func (x *GetModuleRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetModuleRequest.ProtoReflect.Descriptor instead.
 func (*GetModuleRequest) Descriptor() ([]byte, []int) {
-	return file_proto_v1_service_proto_rawDescGZIP(), []int{8}
+	return file_proto_v1_service_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *GetModuleRequest) GetName() string {
@@ -626,7 +731,7 @@ type GetModuleResponse struct {
 
 func (x *GetModuleResponse) Reset() {
 	*x = GetModuleResponse{}
-	mi := &file_proto_v1_service_proto_msgTypes[9]
+	mi := &file_proto_v1_service_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -638,7 +743,7 @@ func (x *GetModuleResponse) String() string {
 func (*GetModuleResponse) ProtoMessage() {}
 
 func (x *GetModuleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_v1_service_proto_msgTypes[9]
+	mi := &file_proto_v1_service_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -651,7 +756,7 @@ func (x *GetModuleResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetModuleResponse.ProtoReflect.Descriptor instead.
 func (*GetModuleResponse) Descriptor() ([]byte, []int) {
-	return file_proto_v1_service_proto_rawDescGZIP(), []int{9}
+	return file_proto_v1_service_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *GetModuleResponse) GetModule() *ModuleProto {
@@ -678,7 +783,7 @@ type GetDependenciesResponse struct {
 
 func (x *GetDependenciesResponse) Reset() {
 	*x = GetDependenciesResponse{}
-	mi := &file_proto_v1_service_proto_msgTypes[10]
+	mi := &file_proto_v1_service_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -690,7 +795,7 @@ func (x *GetDependenciesResponse) String() string {
 func (*GetDependenciesResponse) ProtoMessage() {}
 
 func (x *GetDependenciesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_v1_service_proto_msgTypes[10]
+	mi := &file_proto_v1_service_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -703,7 +808,7 @@ func (x *GetDependenciesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDependenciesResponse.ProtoReflect.Descriptor instead.
 func (*GetDependenciesResponse) Descriptor() ([]byte, []int) {
-	return file_proto_v1_service_proto_rawDescGZIP(), []int{10}
+	return file_proto_v1_service_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *GetDependenciesResponse) GetDependencies() *DependenciesProto {
@@ -730,7 +835,7 @@ type UpdateRequest struct {
 
 func (x *UpdateRequest) Reset() {
 	*x = UpdateRequest{}
-	mi := &file_proto_v1_service_proto_msgTypes[11]
+	mi := &file_proto_v1_service_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -742,7 +847,7 @@ func (x *UpdateRequest) String() string {
 func (*UpdateRequest) ProtoMessage() {}
 
 func (x *UpdateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_v1_service_proto_msgTypes[11]
+	mi := &file_proto_v1_service_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -755,7 +860,7 @@ func (x *UpdateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateRequest.ProtoReflect.Descriptor instead.
 func (*UpdateRequest) Descriptor() ([]byte, []int) {
-	return file_proto_v1_service_proto_rawDescGZIP(), []int{11}
+	return file_proto_v1_service_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *UpdateRequest) GetModulePath() string {
@@ -784,7 +889,7 @@ type UpdateResponse struct {
 
 func (x *UpdateResponse) Reset() {
 	*x = UpdateResponse{}
-	mi := &file_proto_v1_service_proto_msgTypes[12]
+	mi := &file_proto_v1_service_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -796,7 +901,7 @@ func (x *UpdateResponse) String() string {
 func (*UpdateResponse) ProtoMessage() {}
 
 func (x *UpdateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_v1_service_proto_msgTypes[12]
+	mi := &file_proto_v1_service_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -809,7 +914,7 @@ func (x *UpdateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateResponse.ProtoReflect.Descriptor instead.
 func (*UpdateResponse) Descriptor() ([]byte, []int) {
-	return file_proto_v1_service_proto_rawDescGZIP(), []int{12}
+	return file_proto_v1_service_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *UpdateResponse) GetOldModule() *ModuleProto {
@@ -851,7 +956,7 @@ type OutputLine struct {
 
 func (x *OutputLine) Reset() {
 	*x = OutputLine{}
-	mi := &file_proto_v1_service_proto_msgTypes[13]
+	mi := &file_proto_v1_service_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -863,7 +968,7 @@ func (x *OutputLine) String() string {
 func (*OutputLine) ProtoMessage() {}
 
 func (x *OutputLine) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_v1_service_proto_msgTypes[13]
+	mi := &file_proto_v1_service_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -876,7 +981,7 @@ func (x *OutputLine) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OutputLine.ProtoReflect.Descriptor instead.
 func (*OutputLine) Descriptor() ([]byte, []int) {
-	return file_proto_v1_service_proto_rawDescGZIP(), []int{13}
+	return file_proto_v1_service_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *OutputLine) GetStream() OutputLine_Stream {
@@ -911,7 +1016,7 @@ type ProgressUpdate struct {
 
 func (x *ProgressUpdate) Reset() {
 	*x = ProgressUpdate{}
-	mi := &file_proto_v1_service_proto_msgTypes[14]
+	mi := &file_proto_v1_service_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -923,7 +1028,7 @@ func (x *ProgressUpdate) String() string {
 func (*ProgressUpdate) ProtoMessage() {}
 
 func (x *ProgressUpdate) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_v1_service_proto_msgTypes[14]
+	mi := &file_proto_v1_service_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -936,7 +1041,7 @@ func (x *ProgressUpdate) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProgressUpdate.ProtoReflect.Descriptor instead.
 func (*ProgressUpdate) Descriptor() ([]byte, []int) {
-	return file_proto_v1_service_proto_rawDescGZIP(), []int{14}
+	return file_proto_v1_service_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *ProgressUpdate) GetPhase() string {
@@ -974,7 +1079,7 @@ type InstallProgress struct {
 
 func (x *InstallProgress) Reset() {
 	*x = InstallProgress{}
-	mi := &file_proto_v1_service_proto_msgTypes[15]
+	mi := &file_proto_v1_service_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -986,7 +1091,7 @@ func (x *InstallProgress) String() string {
 func (*InstallProgress) ProtoMessage() {}
 
 func (x *InstallProgress) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_v1_service_proto_msgTypes[15]
+	mi := &file_proto_v1_service_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -999,7 +1104,7 @@ func (x *InstallProgress) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InstallProgress.ProtoReflect.Descriptor instead.
 func (*InstallProgress) Descriptor() ([]byte, []int) {
-	return file_proto_v1_service_proto_rawDescGZIP(), []int{15}
+	return file_proto_v1_service_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *InstallProgress) GetUpdate() isInstallProgress_Update {
@@ -1074,7 +1179,13 @@ const file_proto_v1_service_proto_rawDesc = "" +
 	"\rdatabase_path\x18\x03 \x01(\tR\fdatabasePath\x12\x18\n" +
 	"\aaddress\x18\x04 \x01(\tR\aaddress\x12%\n" +
 	"\x0euptime_seconds\x18\x05 \x01(\x03R\ruptimeSeconds\x12!\n" +
-	"\fmodule_count\x18\x06 \x01(\x03R\vmoduleCount\"\x86\x01\n" +
+	"\fmodule_count\x18\x06 \x01(\x03R\vmoduleCount\"\x84\x01\n" +
+	"\x12StoreModuleRequest\x12-\n" +
+	"\x06module\x18\x01 \x01(\v2\x15.database.ModuleProtoR\x06module\x12?\n" +
+	"\fdependencies\x18\x02 \x01(\v2\x1b.database.DependenciesProtoR\fdependencies\"T\n" +
+	"\x13StoreModuleResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12#\n" +
+	"\rerror_message\x18\x02 \x01(\tR\ferrorMessage\"\x86\x01\n" +
 	"\x0eInstallRequest\x12\x1f\n" +
 	"\vmodule_path\x18\x01 \x01(\tR\n" +
 	"modulePath\x12\x18\n" +
@@ -1139,16 +1250,13 @@ const file_proto_v1_service_proto_rawDesc = "" +
 	"\x06output\x18\x01 \x01(\v2\x13.glix.v1.OutputLineH\x00R\x06output\x125\n" +
 	"\bprogress\x18\x02 \x01(\v2\x17.glix.v1.ProgressUpdateH\x00R\bprogress\x122\n" +
 	"\x06result\x18\x03 \x01(\v2\x18.glix.v1.InstallResponseH\x00R\x06resultB\b\n" +
-	"\x06update2\x9d\x05\n" +
-	"\vGlixService\x12<\n" +
-	"\aInstall\x12\x17.glix.v1.InstallRequest\x1a\x18.glix.v1.InstallResponse\x12D\n" +
-	"\rInstallStream\x12\x17.glix.v1.InstallRequest\x1a\x18.glix.v1.InstallProgress0\x01\x129\n" +
-	"\x06Remove\x12\x16.glix.v1.RemoveRequest\x1a\x17.glix.v1.RemoveResponse\x129\n" +
-	"\x06Update\x12\x16.glix.v1.UpdateRequest\x1a\x17.glix.v1.UpdateResponse\x12B\n" +
-	"\fUpdateStream\x12\x16.glix.v1.UpdateRequest\x1a\x18.glix.v1.InstallProgress0\x01\x12H\n" +
+	"\x06update2\xe4\x03\n" +
+	"\vGlixService\x12H\n" +
+	"\vStoreModule\x12\x1b.glix.v1.StoreModuleRequest\x1a\x1c.glix.v1.StoreModuleResponse\x12H\n" +
 	"\vListModules\x12\x1b.glix.v1.ListModulesRequest\x1a\x1c.glix.v1.ListModulesResponse\x12B\n" +
 	"\tGetModule\x12\x19.glix.v1.GetModuleRequest\x1a\x1a.glix.v1.GetModuleResponse\x12N\n" +
-	"\x0fGetDependencies\x12\x19.glix.v1.GetModuleRequest\x1a .glix.v1.GetDependenciesResponse\x12:\n" +
+	"\x0fGetDependencies\x12\x19.glix.v1.GetModuleRequest\x1a .glix.v1.GetDependenciesResponse\x129\n" +
+	"\x06Remove\x12\x16.glix.v1.RemoveRequest\x1a\x17.glix.v1.RemoveResponse\x12:\n" +
 	"\tGetStatus\x12\x16.google.protobuf.Empty\x1a\x15.glix.v1.ServerStatus\x126\n" +
 	"\x04Ping\x12\x16.google.protobuf.Empty\x1a\x16.google.protobuf.EmptyB$Z\"github.com/inovacc/glix/pkg/api/v1b\x06proto3"
 
@@ -1165,65 +1273,63 @@ func file_proto_v1_service_proto_rawDescGZIP() []byte {
 }
 
 var file_proto_v1_service_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_proto_v1_service_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
+var file_proto_v1_service_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
 var file_proto_v1_service_proto_goTypes = []any{
 	(OutputLine_Stream)(0),          // 0: glix.v1.OutputLine.Stream
 	(*ServerConfig)(nil),            // 1: glix.v1.ServerConfig
 	(*ServerStatus)(nil),            // 2: glix.v1.ServerStatus
-	(*InstallRequest)(nil),          // 3: glix.v1.InstallRequest
-	(*InstallResponse)(nil),         // 4: glix.v1.InstallResponse
-	(*RemoveRequest)(nil),           // 5: glix.v1.RemoveRequest
-	(*RemoveResponse)(nil),          // 6: glix.v1.RemoveResponse
-	(*ListModulesRequest)(nil),      // 7: glix.v1.ListModulesRequest
-	(*ListModulesResponse)(nil),     // 8: glix.v1.ListModulesResponse
-	(*GetModuleRequest)(nil),        // 9: glix.v1.GetModuleRequest
-	(*GetModuleResponse)(nil),       // 10: glix.v1.GetModuleResponse
-	(*GetDependenciesResponse)(nil), // 11: glix.v1.GetDependenciesResponse
-	(*UpdateRequest)(nil),           // 12: glix.v1.UpdateRequest
-	(*UpdateResponse)(nil),          // 13: glix.v1.UpdateResponse
-	(*OutputLine)(nil),              // 14: glix.v1.OutputLine
-	(*ProgressUpdate)(nil),          // 15: glix.v1.ProgressUpdate
-	(*InstallProgress)(nil),         // 16: glix.v1.InstallProgress
-	(*ModuleProto)(nil),             // 17: database.ModuleProto
-	(*DependenciesProto)(nil),       // 18: database.DependenciesProto
-	(*emptypb.Empty)(nil),           // 19: google.protobuf.Empty
+	(*StoreModuleRequest)(nil),      // 3: glix.v1.StoreModuleRequest
+	(*StoreModuleResponse)(nil),     // 4: glix.v1.StoreModuleResponse
+	(*InstallRequest)(nil),          // 5: glix.v1.InstallRequest
+	(*InstallResponse)(nil),         // 6: glix.v1.InstallResponse
+	(*RemoveRequest)(nil),           // 7: glix.v1.RemoveRequest
+	(*RemoveResponse)(nil),          // 8: glix.v1.RemoveResponse
+	(*ListModulesRequest)(nil),      // 9: glix.v1.ListModulesRequest
+	(*ListModulesResponse)(nil),     // 10: glix.v1.ListModulesResponse
+	(*GetModuleRequest)(nil),        // 11: glix.v1.GetModuleRequest
+	(*GetModuleResponse)(nil),       // 12: glix.v1.GetModuleResponse
+	(*GetDependenciesResponse)(nil), // 13: glix.v1.GetDependenciesResponse
+	(*UpdateRequest)(nil),           // 14: glix.v1.UpdateRequest
+	(*UpdateResponse)(nil),          // 15: glix.v1.UpdateResponse
+	(*OutputLine)(nil),              // 16: glix.v1.OutputLine
+	(*ProgressUpdate)(nil),          // 17: glix.v1.ProgressUpdate
+	(*InstallProgress)(nil),         // 18: glix.v1.InstallProgress
+	(*ModuleProto)(nil),             // 19: database.ModuleProto
+	(*DependenciesProto)(nil),       // 20: database.DependenciesProto
+	(*emptypb.Empty)(nil),           // 21: google.protobuf.Empty
 }
 var file_proto_v1_service_proto_depIdxs = []int32{
-	17, // 0: glix.v1.InstallResponse.module:type_name -> database.ModuleProto
-	17, // 1: glix.v1.ListModulesResponse.modules:type_name -> database.ModuleProto
-	17, // 2: glix.v1.GetModuleResponse.module:type_name -> database.ModuleProto
-	18, // 3: glix.v1.GetDependenciesResponse.dependencies:type_name -> database.DependenciesProto
-	17, // 4: glix.v1.UpdateResponse.old_module:type_name -> database.ModuleProto
-	17, // 5: glix.v1.UpdateResponse.new_module:type_name -> database.ModuleProto
-	0,  // 6: glix.v1.OutputLine.stream:type_name -> glix.v1.OutputLine.Stream
-	14, // 7: glix.v1.InstallProgress.output:type_name -> glix.v1.OutputLine
-	15, // 8: glix.v1.InstallProgress.progress:type_name -> glix.v1.ProgressUpdate
-	4,  // 9: glix.v1.InstallProgress.result:type_name -> glix.v1.InstallResponse
-	3,  // 10: glix.v1.GlixService.Install:input_type -> glix.v1.InstallRequest
-	3,  // 11: glix.v1.GlixService.InstallStream:input_type -> glix.v1.InstallRequest
-	5,  // 12: glix.v1.GlixService.Remove:input_type -> glix.v1.RemoveRequest
-	12, // 13: glix.v1.GlixService.Update:input_type -> glix.v1.UpdateRequest
-	12, // 14: glix.v1.GlixService.UpdateStream:input_type -> glix.v1.UpdateRequest
-	7,  // 15: glix.v1.GlixService.ListModules:input_type -> glix.v1.ListModulesRequest
-	9,  // 16: glix.v1.GlixService.GetModule:input_type -> glix.v1.GetModuleRequest
-	9,  // 17: glix.v1.GlixService.GetDependencies:input_type -> glix.v1.GetModuleRequest
-	19, // 18: glix.v1.GlixService.GetStatus:input_type -> google.protobuf.Empty
-	19, // 19: glix.v1.GlixService.Ping:input_type -> google.protobuf.Empty
-	4,  // 20: glix.v1.GlixService.Install:output_type -> glix.v1.InstallResponse
-	16, // 21: glix.v1.GlixService.InstallStream:output_type -> glix.v1.InstallProgress
-	6,  // 22: glix.v1.GlixService.Remove:output_type -> glix.v1.RemoveResponse
-	13, // 23: glix.v1.GlixService.Update:output_type -> glix.v1.UpdateResponse
-	16, // 24: glix.v1.GlixService.UpdateStream:output_type -> glix.v1.InstallProgress
-	8,  // 25: glix.v1.GlixService.ListModules:output_type -> glix.v1.ListModulesResponse
-	10, // 26: glix.v1.GlixService.GetModule:output_type -> glix.v1.GetModuleResponse
-	11, // 27: glix.v1.GlixService.GetDependencies:output_type -> glix.v1.GetDependenciesResponse
-	2,  // 28: glix.v1.GlixService.GetStatus:output_type -> glix.v1.ServerStatus
-	19, // 29: glix.v1.GlixService.Ping:output_type -> google.protobuf.Empty
-	20, // [20:30] is the sub-list for method output_type
-	10, // [10:20] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	19, // 0: glix.v1.StoreModuleRequest.module:type_name -> database.ModuleProto
+	20, // 1: glix.v1.StoreModuleRequest.dependencies:type_name -> database.DependenciesProto
+	19, // 2: glix.v1.InstallResponse.module:type_name -> database.ModuleProto
+	19, // 3: glix.v1.ListModulesResponse.modules:type_name -> database.ModuleProto
+	19, // 4: glix.v1.GetModuleResponse.module:type_name -> database.ModuleProto
+	20, // 5: glix.v1.GetDependenciesResponse.dependencies:type_name -> database.DependenciesProto
+	19, // 6: glix.v1.UpdateResponse.old_module:type_name -> database.ModuleProto
+	19, // 7: glix.v1.UpdateResponse.new_module:type_name -> database.ModuleProto
+	0,  // 8: glix.v1.OutputLine.stream:type_name -> glix.v1.OutputLine.Stream
+	16, // 9: glix.v1.InstallProgress.output:type_name -> glix.v1.OutputLine
+	17, // 10: glix.v1.InstallProgress.progress:type_name -> glix.v1.ProgressUpdate
+	6,  // 11: glix.v1.InstallProgress.result:type_name -> glix.v1.InstallResponse
+	3,  // 12: glix.v1.GlixService.StoreModule:input_type -> glix.v1.StoreModuleRequest
+	9,  // 13: glix.v1.GlixService.ListModules:input_type -> glix.v1.ListModulesRequest
+	11, // 14: glix.v1.GlixService.GetModule:input_type -> glix.v1.GetModuleRequest
+	11, // 15: glix.v1.GlixService.GetDependencies:input_type -> glix.v1.GetModuleRequest
+	7,  // 16: glix.v1.GlixService.Remove:input_type -> glix.v1.RemoveRequest
+	21, // 17: glix.v1.GlixService.GetStatus:input_type -> google.protobuf.Empty
+	21, // 18: glix.v1.GlixService.Ping:input_type -> google.protobuf.Empty
+	4,  // 19: glix.v1.GlixService.StoreModule:output_type -> glix.v1.StoreModuleResponse
+	10, // 20: glix.v1.GlixService.ListModules:output_type -> glix.v1.ListModulesResponse
+	12, // 21: glix.v1.GlixService.GetModule:output_type -> glix.v1.GetModuleResponse
+	13, // 22: glix.v1.GlixService.GetDependencies:output_type -> glix.v1.GetDependenciesResponse
+	8,  // 23: glix.v1.GlixService.Remove:output_type -> glix.v1.RemoveResponse
+	2,  // 24: glix.v1.GlixService.GetStatus:output_type -> glix.v1.ServerStatus
+	21, // 25: glix.v1.GlixService.Ping:output_type -> google.protobuf.Empty
+	19, // [19:26] is the sub-list for method output_type
+	12, // [12:19] is the sub-list for method input_type
+	12, // [12:12] is the sub-list for extension type_name
+	12, // [12:12] is the sub-list for extension extendee
+	0,  // [0:12] is the sub-list for field type_name
 }
 
 func init() { file_proto_v1_service_proto_init() }
@@ -1232,7 +1338,7 @@ func file_proto_v1_service_proto_init() {
 		return
 	}
 	file_proto_v1_database_proto_init()
-	file_proto_v1_service_proto_msgTypes[15].OneofWrappers = []any{
+	file_proto_v1_service_proto_msgTypes[17].OneofWrappers = []any{
 		(*InstallProgress_Output)(nil),
 		(*InstallProgress_Progress)(nil),
 		(*InstallProgress_Result)(nil),
@@ -1243,7 +1349,7 @@ func file_proto_v1_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_v1_service_proto_rawDesc), len(file_proto_v1_service_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   16,
+			NumMessages:   18,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

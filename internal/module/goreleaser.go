@@ -8,8 +8,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-
-	"github.com/inovacc/glix/pkg/exec"
 )
 
 // hasGoReleaserConfig checks if the module has a .goreleaser.yaml or .goreleaser.yml file
@@ -26,62 +24,6 @@ func (m *Module) hasGoReleaserConfig(ctx context.Context, moduleDir string) (boo
 	}
 
 	return false, "", nil
-}
-
-// ensureGoReleaserInstalled checks if goreleaser is installed, and installs it if not
-func (m *Module) ensureGoReleaserInstalled(ctx context.Context) error {
-	// Check if goreleaser is already installed
-	cmd := exec.CommandContext(ctx, "goreleaser", "--version")
-	if err := cmd.Run(); err == nil {
-		return nil // Already installed
-	}
-
-	fmt.Println("GoReleaser not found, installing...")
-
-	// Install goreleaser
-	installCmd := exec.CommandContext(ctx, m.goBinPath, "install", "github.com/goreleaser/goreleaser/v2@latest")
-
-	if err := installCmd.Run(); err != nil {
-		return fmt.Errorf("failed to install goreleaser: %w", err)
-	}
-
-	fmt.Println("GoReleaser installed successfully")
-
-	return nil
-}
-
-// buildWithGoReleaser builds the module using goreleaser
-func (m *Module) buildWithGoReleaser(ctx context.Context, moduleDir string) (string, error) {
-	fmt.Println("Building with GoReleaser...")
-
-	// Run goreleaser build --snapshot --clean
-	cmd := exec.CommandContext(ctx, "goreleaser", "build", "--snapshot", "--clean")
-	cmd.Dir = moduleDir
-
-	// Set default environment variables that might be needed by .goreleaser.yaml
-	env := os.Environ()
-
-	// Extract owner from module name (e.g., github.com/owner/repo -> owner)
-	parts := strings.Split(m.Name, "/")
-	if len(parts) >= 2 {
-		owner := parts[len(parts)-2]
-		env = append(env, fmt.Sprintf("GITHUB_OWNER=%s", owner))
-	}
-
-	cmd.Env = env
-
-	var out strings.Builder
-
-	cmd.Stdout = &out
-	cmd.Stderr = &out
-
-	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("goreleaser build failed: %w\nOutput: %s", err, out.String())
-	}
-
-	fmt.Println("Build completed successfully")
-
-	return out.String(), nil
 }
 
 // findBuiltBinary finds the built binary in the dist directory
@@ -145,80 +87,6 @@ func (m *Module) findBuiltBinary(distDir string) (string, error) {
 	}
 
 	return foundBinary, nil
-}
-
-// installViaGoReleaser installs a module by building it with goreleaser
-func (m *Module) installViaGoReleaser(ctx context.Context, moduleDir string) error {
-	// Ensure goreleaser is installed
-	if err := m.ensureGoReleaserInstalled(ctx); err != nil {
-		return err
-	}
-
-	cacheDir, err := GetApplicationCacheDirectory()
-	if err != nil {
-		return err
-	}
-
-	defer func() {
-		_ = os.RemoveAll(cacheDir)
-	}()
-
-	buildDir := filepath.Join(cacheDir, "build")
-	if err := copyDir(moduleDir, buildDir); err != nil {
-		return fmt.Errorf("failed to copy module source: %w", err)
-	}
-
-	// Build with goreleaser
-	if _, err := m.buildWithGoReleaser(ctx, buildDir); err != nil {
-		return err
-	}
-
-	// Find the built binary
-	distDir := filepath.Join(buildDir, "dist")
-
-	binaryPath, err := m.findBuiltBinary(distDir)
-	if err != nil {
-		return err
-	}
-
-	fmt.Printf("Found binary: %s\n", filepath.Base(binaryPath))
-
-	// Get GOBIN path
-	gopath := os.Getenv("GOPATH")
-	if gopath == "" {
-		gopath = filepath.Join(os.Getenv("HOME"), "go")
-	}
-
-	gobin := filepath.Join(gopath, "bin")
-
-	// Ensure GOBIN directory exists
-	if err := os.MkdirAll(gobin, 0755); err != nil {
-		return fmt.Errorf("failed to create GOBIN directory: %w", err)
-	}
-
-	// Determine binary name from the module name
-	binaryName := filepath.Base(m.Name)
-	if runtime.GOOS == "windows" && !strings.HasSuffix(binaryName, ".exe") {
-		binaryName += ".exe"
-	}
-
-	destPath := filepath.Join(gobin, binaryName)
-
-	// Copy the binary to GOBIN
-	if err := copyFile(binaryPath, destPath); err != nil {
-		return fmt.Errorf("failed to copy binary to GOBIN: %w", err)
-	}
-
-	// Make it executable (Unix only)
-	if runtime.GOOS != "windows" {
-		if err := os.Chmod(destPath, 0755); err != nil {
-			return fmt.Errorf("failed to make binary executable: %w", err)
-		}
-	}
-
-	fmt.Printf("Binary installed to: %s\n", destPath)
-
-	return nil
 }
 
 // copyFile copies a file from src to dst

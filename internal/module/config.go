@@ -47,3 +47,12 @@ func GetApplicationCacheDirectory() (string, error) {
 func GetDatabaseDirectory() string {
 	return filepath.Join(appDir, fmt.Sprintf("%s.bolt", appName))
 }
+
+// GetApplicationConfigDirectory returns the path to the config directory
+func GetApplicationConfigDirectory() (string, error) {
+	configDir := filepath.Join(appDir, "config")
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		return "", err
+	}
+	return configDir, nil
+}

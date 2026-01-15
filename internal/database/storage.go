@@ -1,16 +1,20 @@
 package database
 
 import (
+	"crypto/sha256"
 	"fmt"
-	"slices"
-	"sort"
-	"strings"
 	"time"
 
 	pb "github.com/inovacc/glix/pkg/api/v1"
 	bolt "go.etcd.io/bbolt"
 	"google.golang.org/protobuf/proto"
 )
+
+// moduleKey generates a hash-based key from the module name (without version)
+func moduleKey(name string) []byte {
+	hash := sha256.Sum256([]byte(name))
+	return hash[:]
+}
 
 // Bucket names
 var (
@@ -83,48 +87,57 @@ func (s *Storage) UpsertModules(module []*pb.ModuleProto) error {
 }
 
 // UpsertModule inserts or updates a module
+// Uses a hash of the module name (without version) as the primary key
+// This ensures only one entry per module, with the latest version stored
 func (s *Storage) UpsertModule(module *pb.ModuleProto) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
+		// Use hash of module name as primary key (ensures one entry per module)
+		key := moduleKey(module.GetName())
+
+		// Check if the module already exists and remove the old time index entry
+		bucket := tx.Bucket(modulesBucket)
+		existingData := bucket.Get(key)
+		if existingData != nil {
+			existingModule := &pb.ModuleProto{}
+			if err := proto.Unmarshal(existingData, existingModule); err == nil {
+				// Remove old time index entry
+				if err := s.deleteFromTimeIndex(tx, existingModule.GetTimestampUnixNano()); err != nil {
+					return fmt.Errorf("failed to delete old time index: %w", err)
+				}
+			}
+		}
+
 		// Serialize module to protobuf
 		data, err := proto.Marshal(module)
 		if err != nil {
 			return fmt.Errorf("failed to marshal module: %w", err)
 		}
 
-		// Create composite key: name@version
-		key := fmt.Appendf(nil, "%s@%s", module.GetName(), module.GetVersion())
-
-		// Store in modules bucket
-		bucket := tx.Bucket(modulesBucket)
+		// Store in modules bucket (using hash key)
 		if err := bucket.Put(key, data); err != nil {
 			return fmt.Errorf("failed to put module: %w", err)
 		}
 
-		// Update time index
-		if err := s.updateTimeIndex(tx, module.GetTimestampUnixNano(), string(key)); err != nil {
+		// Update time index (use module name as value for lookup)
+		if err := s.updateTimeIndex(tx, module.GetTimestampUnixNano(), module.GetName()); err != nil {
 			return fmt.Errorf("failed to update time index: %w", err)
-		}
-
-		// Update name index
-		if err := s.updateNameIndex(tx, module.GetName(), module.GetVersion()); err != nil {
-			return fmt.Errorf("failed to update name index: %w", err)
 		}
 
 		return nil
 	})
 }
 
-// GetModule retrieves a module by name and version
-func (s *Storage) GetModule(name, version string) (*pb.ModuleProto, error) {
+// GetModule retrieves a module by name (version is optional, ignored since we store one version per module)
+func (s *Storage) GetModule(name, _ string) (*pb.ModuleProto, error) {
 	var module *pb.ModuleProto
 
 	err := s.db.View(func(tx *bolt.Tx) error {
-		key := fmt.Appendf(nil, "%s@%s", name, version)
+		key := moduleKey(name)
 		bucket := tx.Bucket(modulesBucket)
 
 		data := bucket.Get(key)
 		if data == nil {
-			return fmt.Errorf("module not found: %s@%s", name, version)
+			return fmt.Errorf("module not found: %s", name)
 		}
 
 		module = &pb.ModuleProto{}
@@ -138,34 +151,14 @@ func (s *Storage) GetModule(name, version string) (*pb.ModuleProto, error) {
 	return module, err
 }
 
-// GetModuleByName retrieves all versions of a module by name
+// GetModuleByName retrieves a module by name (returns a slice for API compatibility)
 func (s *Storage) GetModuleByName(name string) ([]*pb.ModuleProto, error) {
-	var modules []*pb.ModuleProto
+	module, err := s.GetModule(name, "")
+	if err != nil {
+		return nil, err
+	}
 
-	err := s.db.View(func(tx *bolt.Tx) error {
-		bucket := tx.Bucket(modulesBucket)
-		cursor := bucket.Cursor()
-
-		// Scan for all keys with prefix "name@"
-		prefix := []byte(name + "@")
-		for k, v := cursor.Seek(prefix); k != nil && strings.HasPrefix(string(k), string(prefix)); k, v = cursor.Next() {
-			module := &pb.ModuleProto{}
-			if err := proto.Unmarshal(v, module); err != nil {
-				return fmt.Errorf("failed to unmarshal module: %w", err)
-			}
-
-			modules = append(modules, module)
-		}
-
-		return nil
-	})
-
-	// Sort by timestamp descending (most recent first)
-	sort.Slice(modules, func(i, j int) bool {
-		return modules[i].GetTimestampUnixNano() > modules[j].GetTimestampUnixNano()
-	})
-
-	return modules, err
+	return []*pb.ModuleProto{module}, nil
 }
 
 // ListModules retrieves all modules ordered by time (most recent first)
@@ -179,10 +172,13 @@ func (s *Storage) ListModules() ([]*pb.ModuleProto, error) {
 
 		// Iterate in reverse order (most recent first)
 		for k, v := cursor.Last(); k != nil; k, v = cursor.Prev() {
-			// v contains the module key (name@version)
+			// v contains the module name, convert to hash key
+			moduleName := string(v)
+			hashKey := moduleKey(moduleName)
+
 			modulesBkt := tx.Bucket(modulesBucket)
 
-			data := modulesBkt.Get(v)
+			data := modulesBkt.Get(hashKey)
 			if data == nil {
 				continue // Skip if module was deleted
 			}
@@ -201,17 +197,17 @@ func (s *Storage) ListModules() ([]*pb.ModuleProto, error) {
 	return modules, err
 }
 
-// DeleteModule removes a module and updates indexes
-func (s *Storage) DeleteModule(name, version string) error {
+// DeleteModule removes a module and updates indexes (version is ignored since we store one version per module)
+func (s *Storage) DeleteModule(name, _ string) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
-		key := fmt.Appendf(nil, "%s@%s", name, version)
+		key := moduleKey(name)
 
 		// Get module first to access timestamp
 		bucket := tx.Bucket(modulesBucket)
 
 		data := bucket.Get(key)
 		if data == nil {
-			return fmt.Errorf("module not found: %s@%s", name, version)
+			return fmt.Errorf("module not found: %s", name)
 		}
 
 		module := &pb.ModuleProto{}
@@ -227,11 +223,6 @@ func (s *Storage) DeleteModule(name, version string) error {
 		// Delete from time index
 		if err := s.deleteFromTimeIndex(tx, module.GetTimestampUnixNano()); err != nil {
 			return fmt.Errorf("failed to delete from time index: %w", err)
-		}
-
-		// Update name index (remove this version)
-		if err := s.deleteFromNameIndex(tx, name, version); err != nil {
-			return fmt.Errorf("failed to update name index: %w", err)
 		}
 
 		// Delete dependencies
@@ -320,12 +311,12 @@ func (s *Storage) CountDependencies() (int64, error) {
 }
 
 // updateTimeIndex adds/updates an entry in the time index
-func (s *Storage) updateTimeIndex(tx *bolt.Tx, timestamp int64, moduleKey string) error {
+func (s *Storage) updateTimeIndex(tx *bolt.Tx, timestamp int64, moduleName string) error {
 	bucket := tx.Bucket(timeIndexBucket)
 
 	// Use timestamp as key for sorting
 	key := fmt.Appendf(nil, "%020d", timestamp) // Zero-padded for lexicographic sorting
-	value := []byte(moduleKey)
+	value := []byte(moduleName)
 
 	return bucket.Put(key, value)
 }
@@ -336,75 +327,4 @@ func (s *Storage) deleteFromTimeIndex(tx *bolt.Tx, timestamp int64) error {
 	key := fmt.Appendf(nil, "%020d", timestamp)
 
 	return bucket.Delete(key)
-}
-
-// updateNameIndex adds a version to the name index
-func (s *Storage) updateNameIndex(tx *bolt.Tx, name, version string) error {
-	bucket := tx.Bucket(nameIndexBucket)
-	key := []byte(name)
-
-	// Get existing versions
-	data := bucket.Get(key)
-	versionList := &pb.VersionListProto{}
-
-	if data != nil {
-		if err := proto.Unmarshal(data, versionList); err != nil {
-			return fmt.Errorf("failed to unmarshal version list: %w", err)
-		}
-	}
-
-	// Add version if not already present
-	found := slices.Contains(versionList.GetVersions(), version)
-
-	if !found {
-		versionList.Versions = append(versionList.Versions, version)
-	}
-
-	// Marshal and store
-	data, err := proto.Marshal(versionList)
-	if err != nil {
-		return fmt.Errorf("failed to marshal version list: %w", err)
-	}
-
-	return bucket.Put(key, data)
-}
-
-// deleteFromNameIndex removes a version from the name index
-func (s *Storage) deleteFromNameIndex(tx *bolt.Tx, name, version string) error {
-	bucket := tx.Bucket(nameIndexBucket)
-	key := []byte(name)
-
-	// Get existing versions
-	data := bucket.Get(key)
-	if data == nil {
-		return nil // Nothing to delete
-	}
-
-	versionList := &pb.VersionListProto{}
-	if err := proto.Unmarshal(data, versionList); err != nil {
-		return fmt.Errorf("failed to unmarshal version list: %w", err)
-	}
-
-	// Remove the version
-	newVersions := make([]string, 0, len(versionList.GetVersions()))
-	for _, v := range versionList.GetVersions() {
-		if v != version {
-			newVersions = append(newVersions, v)
-		}
-	}
-
-	// If no versions left, delete the key
-	if len(newVersions) == 0 {
-		return bucket.Delete(key)
-	}
-
-	// Update the list
-	versionList.Versions = newVersions
-
-	data, err := proto.Marshal(versionList)
-	if err != nil {
-		return fmt.Errorf("failed to marshal version list: %w", err)
-	}
-
-	return bucket.Put(key, data)
 }
