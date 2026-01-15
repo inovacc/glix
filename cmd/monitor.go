@@ -10,6 +10,7 @@ import (
 
 	"github.com/inovacc/glix/internal/client"
 	"github.com/inovacc/glix/internal/module"
+	"github.com/inovacc/glix/internal/tui"
 	"github.com/spf13/cobra"
 )
 
@@ -49,7 +50,73 @@ type moduleStatus struct {
 func runMonitor(cmd *cobra.Command, _ []string) error {
 	ctx := cmd.Context()
 
+	if IsTUIEnabled() {
+		return runMonitorWithTUI(ctx)
+	}
+
+	return runMonitorPlainText(ctx, cmd)
+}
+
+func runMonitorWithTUI(ctx context.Context) error {
+	// Create TUI instance
+	t := tui.New()
+
+	// Create a context that we can cancel when TUI exits
+	tuiCtx, tuiCancel := context.WithCancel(ctx)
+	defer tuiCancel()
+
+	// Channel to communicate errors
+	errCh := make(chan error, 1)
+
+	// Run monitor in background
+	go func() {
+		errCh <- doMonitor(tuiCtx, t.ProgressHandler(), t.OutputHandler(), t.SetStatus)
+	}()
+
+	// Wait for completion
+	go func() {
+		err := <-errCh
+		t.Done(err)
+	}()
+
+	// Run TUI
+	if err := t.Start(tuiCtx); err != nil {
+		return fmt.Errorf("TUI error: %w", err)
+	}
+
+	return nil
+}
+
+func runMonitorPlainText(ctx context.Context, cmd *cobra.Command) error {
+	progressHandler := func(phase, message string) {
+		cmd.Printf("[%s] %s\n", phase, message)
+	}
+
+	outputHandler := func(stream, line string) {
+		if stream == "stderr" {
+			_, _ = fmt.Fprintln(cmd.ErrOrStderr(), line)
+		} else {
+			_, _ = fmt.Fprintln(cmd.OutOrStdout(), line)
+		}
+	}
+
+	statusHandler := func(text string) {
+		// In plain text mode, status is shown via progress
+	}
+
+	return doMonitor(ctx, progressHandler, outputHandler, statusHandler)
+}
+
+func doMonitor(
+	ctx context.Context,
+	progressHandler func(phase, message string),
+	outputHandler func(stream, line string),
+	statusHandler func(text string),
+) error {
+	statusHandler("Checking for updates...")
+
 	// Connect to server
+	progressHandler("connect", "Connecting to server...")
 	cfg := client.DefaultDiscoveryConfig()
 	grpcClient, err := client.GetClient(ctx, cfg)
 	if err != nil {
@@ -60,6 +127,7 @@ func runMonitor(cmd *cobra.Command, _ []string) error {
 	}()
 
 	// List all installed modules
+	progressHandler("list", "Listing installed modules...")
 	resp, err := grpcClient.ListModules(ctx, 0, 0, "")
 	if err != nil {
 		return fmt.Errorf("failed to list modules: %w", err)
@@ -67,27 +135,36 @@ func runMonitor(cmd *cobra.Command, _ []string) error {
 
 	modules := resp.GetModules()
 	if len(modules) == 0 {
-		cmd.Println("No modules installed")
+		progressHandler("complete", "No modules installed")
+		statusHandler("No modules installed")
 		return nil
 	}
 
-	cmd.Printf("Checking %d installed module(s) for updates...\n\n", len(modules))
+	progressHandler("check", fmt.Sprintf("Checking %d module(s) for updates...", len(modules)))
+	statusHandler(fmt.Sprintf("Checking %d modules...", len(modules)))
 
 	// Check each module for updates concurrently
 	statuses := make([]moduleStatus, len(modules))
 	var wg sync.WaitGroup
+	var mu sync.Mutex
+	checked := 0
 
 	for i, mod := range modules {
 		wg.Add(1)
 		go func(idx int, modName, modVersion string) {
 			defer wg.Done()
 			statuses[idx] = checkModuleUpdate(ctx, modName, modVersion)
+
+			mu.Lock()
+			checked++
+			progressHandler("check", fmt.Sprintf("Checked %d/%d: %s", checked, len(modules), modName))
+			mu.Unlock()
 		}(i, mod.GetName(), mod.GetVersion())
 	}
 
 	wg.Wait()
 
-	// Display results
+	// Categorize results
 	var updatesAvailable []moduleStatus
 	var upToDate []moduleStatus
 	var errors []moduleStatus
@@ -102,54 +179,50 @@ func runMonitor(cmd *cobra.Command, _ []string) error {
 		}
 	}
 
-	// Show modules with updates available
+	// Report results
 	if len(updatesAvailable) > 0 {
-		cmd.Println("Updates available:")
+		progressHandler("result", fmt.Sprintf("%d update(s) available:", len(updatesAvailable)))
 		for _, s := range updatesAvailable {
-			cmd.Printf("  %s\n", s.Name)
-			cmd.Printf("    Installed: %s\n", s.InstalledVersion)
-			cmd.Printf("    Latest:    %s\n", s.LatestVersion)
+			outputHandler("stdout", fmt.Sprintf("  %s: %s -> %s", s.Name, s.InstalledVersion, s.LatestVersion))
 		}
-		cmd.Println()
 	}
 
-	// Show up-to-date modules
 	if len(upToDate) > 0 {
-		cmd.Println("Up to date:")
-		for _, s := range upToDate {
-			cmd.Printf("  %s@%s\n", s.Name, s.InstalledVersion)
-		}
-		cmd.Println()
+		progressHandler("result", fmt.Sprintf("%d module(s) up to date", len(upToDate)))
 	}
 
-	// Show errors
 	if len(errors) > 0 {
-		cmd.Println("Errors checking:")
+		progressHandler("result", fmt.Sprintf("%d error(s):", len(errors)))
 		for _, s := range errors {
-			cmd.Printf("  %s: %v\n", s.Name, s.Error)
+			outputHandler("stderr", fmt.Sprintf("  %s: %v", s.Name, s.Error))
 		}
-		cmd.Println()
 	}
 
 	// Summary
-	cmd.Printf("Summary: %d up to date, %d update(s) available, %d error(s)\n",
+	summary := fmt.Sprintf("Summary: %d up to date, %d update(s) available, %d error(s)",
 		len(upToDate), len(updatesAvailable), len(errors))
+	progressHandler("summary", summary)
+	statusHandler(summary)
 
 	// If --update flag is set, update all outdated modules
 	if monitorUpdateAll && len(updatesAvailable) > 0 {
-		cmd.Println()
-		cmd.Println("Updating outdated modules...")
-		cmd.Println()
+		progressHandler("update", "Updating outdated modules...")
 
 		for _, s := range updatesAvailable {
-			cmd.Printf("Updating %s: %s -> %s\n", s.Name, s.InstalledVersion, s.LatestVersion)
+			progressHandler("update", fmt.Sprintf("Updating %s: %s -> %s", s.Name, s.InstalledVersion, s.LatestVersion))
+			statusHandler(fmt.Sprintf("Updating %s...", s.Name))
 
-			if err := updateModule(cmd, grpcClient, s.Name); err != nil {
-				cmd.PrintErrf("  Failed: %v\n", err)
+			if err := updateModuleCore(ctx, grpcClient, s.Name); err != nil {
+				progressHandler("error", fmt.Sprintf("Failed to update %s: %v", s.Name, err))
 			} else {
-				cmd.Println("  Done")
+				progressHandler("update", fmt.Sprintf("Updated %s to %s", s.Name, s.LatestVersion))
 			}
 		}
+
+		progressHandler("complete", "All updates complete")
+		statusHandler("Updates complete")
+	} else {
+		progressHandler("complete", "Check complete")
 	}
 
 	return nil
@@ -197,10 +270,8 @@ func checkModuleUpdate(ctx context.Context, moduleName, installedVersion string)
 	return status
 }
 
-// updateModule updates a single module
-func updateModule(cmd *cobra.Command, grpcClient *client.Client, moduleName string) error {
-	ctx := cmd.Context()
-
+// updateModuleCore updates a single module (core logic without TUI)
+func updateModuleCore(ctx context.Context, grpcClient *client.Client, moduleName string) error {
 	// Create a unique working directory
 	cacheDir, err := module.GetApplicationCacheDirectory()
 	if err != nil {

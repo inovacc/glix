@@ -18,7 +18,7 @@ func TestModule_Check(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := mod.SaveToFile("module_data.json"); err != nil {
+	if err := mod.SaveToFile("testdata/module_data.json"); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -36,7 +36,7 @@ func TestModule_Check_Latest(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := mod.SaveToFile("module_data_latest.json"); err != nil {
+	if err := mod.SaveToFile("testdatamodule_data_latest.json"); err != nil {
 		t.Fatal(err)
 	}
 

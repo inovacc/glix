@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -17,6 +18,10 @@ import (
 	"golang.org/x/mod/semver"
 )
 
+// dummyModuleName is the name used for temporary Go modules created during
+// version resolution and dependency extraction. Using a dummy module allows
+// us to run go commands like `go list -m -versions` and `go get` without
+// polluting the user's workspace.
 const dummyModuleName = "dummy"
 
 // ProgressHandler is called to report progress during module operations
@@ -81,6 +86,35 @@ func (m *Module) progress(phase, message string) {
 	if m.progressHandler != nil {
 		m.progressHandler(phase, message)
 	}
+}
+
+// setupTempModule initializes a temporary Go module in the working directory.
+// This creates a minimal go.mod file that allows running go commands for
+// module resolution and dependency extraction.
+func (m *Module) setupTempModule(ctx context.Context) error {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	absCwd, err := filepath.Abs(cwd)
+	if err != nil {
+		return err
+	}
+
+	absWorkingDir, err := filepath.Abs(m.workingDir)
+	if err != nil {
+		return err
+	}
+
+	if absWorkingDir != absCwd {
+		cmd := exec.CommandContext(ctx, m.goBinPath, "mod", "init", dummyModuleName)
+		cmd.Dir = m.workingDir
+
+		return cmd.Run()
+	}
+
+	return nil
 }
 
 func (m *Module) FetchModuleInfo(module string) error {
@@ -429,13 +463,6 @@ func (m *Module) fetchModuleVersions(ctx context.Context, module string) (*fetch
 	}
 
 	return nil, fmt.Errorf("failed to resolve module versions for %q (initially %q)", module, original)
-}
-
-func (m *Module) setupTempModule(ctx context.Context) error {
-	cmd := exec.CommandContext(ctx, m.goBinPath, "mod", "init", dummyModuleName)
-	cmd.Dir = m.workingDir
-
-	return cmd.Run()
 }
 
 func (m *Module) getModule(ctx context.Context, moduleWithVersion string) error {

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/inovacc/glix/internal/client"
 	"github.com/inovacc/glix/internal/module"
+	"github.com/inovacc/glix/internal/tui"
 	"github.com/spf13/cobra"
 	"golang.org/x/mod/semver"
 )
@@ -37,6 +39,72 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	// Parse module path (strip URL prefixes if any)
 	modulePath, _ := parseModulePath(args[0])
 
+	if IsTUIEnabled() {
+		return runUpdateWithTUI(ctx, modulePath)
+	}
+
+	return runUpdatePlainText(ctx, cmd, modulePath)
+}
+
+func runUpdateWithTUI(ctx context.Context, modulePath string) error {
+	// Create TUI instance
+	t := tui.New()
+
+	// Create a context that we can cancel when TUI exits
+	tuiCtx, tuiCancel := context.WithCancel(ctx)
+	defer tuiCancel()
+
+	// Channel to communicate errors from the update goroutine
+	errCh := make(chan error, 1)
+
+	// Run update in background
+	go func() {
+		errCh <- doUpdate(tuiCtx, modulePath, t.ProgressHandler(), t.OutputHandler(), t.SetStatus)
+	}()
+
+	// Wait for update to complete
+	go func() {
+		err := <-errCh
+		t.Done(err)
+	}()
+
+	// Run TUI
+	if err := t.Start(tuiCtx); err != nil {
+		return fmt.Errorf("TUI error: %w", err)
+	}
+
+	return nil
+}
+
+func runUpdatePlainText(ctx context.Context, cmd *cobra.Command, modulePath string) error {
+	progressHandler := func(phase, message string) {
+		cmd.Printf("[%s] %s\n", phase, message)
+	}
+
+	outputHandler := func(stream, line string) {
+		if stream == "stderr" {
+			_, _ = fmt.Fprintln(cmd.ErrOrStderr(), line)
+		} else {
+			_, _ = fmt.Fprintln(cmd.OutOrStdout(), line)
+		}
+	}
+
+	statusHandler := func(text string) {
+		cmd.Printf("Status: %s\n", text)
+	}
+
+	return doUpdate(ctx, modulePath, progressHandler, outputHandler, statusHandler)
+}
+
+func doUpdate(
+	ctx context.Context,
+	modulePath string,
+	progressHandler func(phase, message string),
+	outputHandler func(stream, line string),
+	statusHandler func(text string),
+) error {
+	statusHandler(fmt.Sprintf("Updating %s", modulePath))
+
 	// Connect to server to get current module info
 	cfg := client.DefaultDiscoveryConfig()
 	grpcClient, err := client.GetClient(ctx, cfg)
@@ -48,6 +116,7 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	}()
 
 	// Get currently installed module
+	progressHandler("check", "Checking installed version...")
 	resp, err := grpcClient.GetModule(ctx, modulePath, "")
 	if err != nil {
 		return fmt.Errorf("failed to query module: %w", err)
@@ -60,7 +129,7 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	installedModule := resp.GetModule()
 	installedVersion := installedModule.GetVersion()
 
-	cmd.Printf("Checking for updates: %s@%s\n", modulePath, installedVersion)
+	progressHandler("check", fmt.Sprintf("Installed: %s@%s", modulePath, installedVersion))
 
 	// Create a unique working directory for this update
 	cacheDir, err := module.GetApplicationCacheDirectory()
@@ -82,8 +151,11 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to create module: %w", err)
 	}
 
+	// Set progress handler
+	m.SetProgressHandler(progressHandler)
+
 	// Fetch latest module info
-	cmd.Println("[...] Fetching latest version information...")
+	progressHandler("fetch", "Fetching latest version information...")
 	if err := m.FetchModuleInfo(modulePath); err != nil {
 		return fmt.Errorf("failed to fetch module info: %w", err)
 	}
@@ -92,20 +164,13 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 
 	// Compare versions
 	if !isNewerVersion(latestVersion, installedVersion) {
-		cmd.Printf("Already at latest version: %s@%s\n", modulePath, installedVersion)
+		progressHandler("complete", fmt.Sprintf("Already at latest version: %s@%s", modulePath, installedVersion))
+		statusHandler(fmt.Sprintf("Up to date: %s@%s", modulePath, installedVersion))
 		return nil
 	}
 
-	cmd.Printf("[...] Updating %s: %s -> %s\n", modulePath, installedVersion, latestVersion)
-
-	// Output handler for streaming installation output
-	outputHandler := func(stream string, line string) {
-		if stream == "stderr" {
-			_, _ = fmt.Fprintln(cmd.ErrOrStderr(), line)
-		} else {
-			_, _ = fmt.Fprintln(cmd.OutOrStdout(), line)
-		}
-	}
+	progressHandler("update", fmt.Sprintf("Updating %s: %s -> %s", modulePath, installedVersion, latestVersion))
+	statusHandler(fmt.Sprintf("Updating %s to %s", modulePath, latestVersion))
 
 	// Install the new version locally with streaming output
 	if err := m.InstallModuleWithStreaming(ctx, outputHandler); err != nil {
@@ -113,14 +178,13 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	}
 
 	// Store updated module info in database via server
+	progressHandler("store", "Saving to database...")
 	if err := grpcClient.StoreModule(ctx, m); err != nil {
-		cmd.PrintErrf("Warning: failed to update module in database: %v\n", err)
+		progressHandler("warning", fmt.Sprintf("failed to update module in database: %v", err))
 	}
 
-	cmd.Println()
-	cmd.Printf("Module updated successfully: %s\n", m.Name)
-	cmd.Printf("  Previous: %s\n", installedVersion)
-	cmd.Printf("  Current:  %s\n", latestVersion)
+	progressHandler("complete", fmt.Sprintf("Updated %s: %s -> %s", m.Name, installedVersion, latestVersion))
+	statusHandler(fmt.Sprintf("Updated %s@%s", m.Name, latestVersion))
 
 	return nil
 }

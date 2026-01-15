@@ -44,7 +44,7 @@ func TestDiscoverFromCmdDir(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create temp directory
+			// Create a temp directory
 			tmpDir, err := os.MkdirTemp("", "discovery-test")
 			if err != nil {
 				t.Fatalf("MkdirTemp() error = %v", err)
@@ -60,7 +60,7 @@ func TestDiscoverFromCmdDir(t *testing.T) {
 				t.Fatalf("NewModule() error = %v", err)
 			}
 
-			// Setup temp module and get the module for testing
+			// Setup a temp module and get the module for testing
 			ctx := context.TODO()
 			if err := m.setupTempModule(ctx); err != nil {
 				t.Fatalf("setupTempModule() error = %v", err)
@@ -168,7 +168,7 @@ func TestHasPackageMain(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create temp directory
+			// Create a temp directory
 			tmpDir, err := os.MkdirTemp("", "discovery-test")
 			if err != nil {
 				t.Fatalf("MkdirTemp() error = %v", err)

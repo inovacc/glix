@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/inovacc/glix/internal/client"
 	"github.com/inovacc/glix/internal/module"
+	"github.com/inovacc/glix/internal/tui"
 	"github.com/spf13/cobra"
 )
 
@@ -41,11 +43,79 @@ func runInstall(cmd *cobra.Command, args []string) error {
 	// Parse module path and version
 	modulePath, version := parseModulePath(args[0])
 
+	if IsTUIEnabled() {
+		return runInstallWithTUI(ctx, cmd, modulePath, version)
+	}
+
+	return runInstallPlainText(ctx, cmd, modulePath, version)
+}
+
+func runInstallWithTUI(ctx context.Context, cmd *cobra.Command, modulePath, version string) error {
+	// Create TUI instance
+	t := tui.New()
+
+	// Create a context that we can cancel when TUI exits
+	tuiCtx, tuiCancel := context.WithCancel(ctx)
+	defer tuiCancel()
+
+	// Channel to communicate errors from the installation goroutine
+	errCh := make(chan error, 1)
+
+	// Run installation in background
+	go func() {
+		errCh <- doInstall(tuiCtx, cmd, modulePath, version, t.ProgressHandler(), t.OutputHandler(), t.SetStatus)
+	}()
+
+	// Start TUI - this blocks until done
+	go func() {
+		// Wait for installation to complete
+		err := <-errCh
+		t.Done(err)
+	}()
+
+	// Run TUI
+	if err := t.Start(tuiCtx); err != nil {
+		return fmt.Errorf("TUI error: %w", err)
+	}
+
+	return nil
+}
+
+func runInstallPlainText(ctx context.Context, cmd *cobra.Command, modulePath, version string) error {
 	cmd.Printf("Installing module: %s", modulePath)
 	if version != "" {
 		cmd.Printf("@%s", version)
 	}
 	cmd.Println()
+
+	progressHandler := func(phase, message string) {
+		cmd.Printf("[%s] %s\n", phase, message)
+	}
+
+	outputHandler := func(stream, line string) {
+		if stream == "stderr" {
+			_, _ = fmt.Fprintln(cmd.ErrOrStderr(), line)
+		} else {
+			_, _ = fmt.Fprintln(cmd.OutOrStdout(), line)
+		}
+	}
+
+	statusHandler := func(text string) {
+		cmd.Printf("Status: %s\n", text)
+	}
+
+	return doInstall(ctx, cmd, modulePath, version, progressHandler, outputHandler, statusHandler)
+}
+
+func doInstall(
+	ctx context.Context,
+	cmd *cobra.Command,
+	modulePath, version string,
+	progressHandler func(phase, message string),
+	outputHandler func(stream, line string),
+	statusHandler func(text string),
+) error {
+	statusHandler(fmt.Sprintf("Installing %s", modulePath))
 
 	// Connect to server first (starts on-demand server if needed)
 	cfg := client.DefaultDiscoveryConfig()
@@ -78,9 +148,7 @@ func runInstall(cmd *cobra.Command, args []string) error {
 	}
 
 	// Set progress handler to show what's happening
-	m.SetProgressHandler(func(phase, message string) {
-		cmd.Printf("[%s] %s\n", phase, message)
-	})
+	m.SetProgressHandler(progressHandler)
 
 	// Build full module path with version if specified
 	fullPath := modulePath
@@ -93,16 +161,8 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to fetch module info: %w", err)
 	}
 
-	cmd.Printf("[install] Installing %s@%s...\n", m.Name, m.Version)
-
-	// Output handler for streaming installation output
-	outputHandler := func(stream string, line string) {
-		if stream == "stderr" {
-			_, _ = fmt.Fprintln(cmd.ErrOrStderr(), line)
-		} else {
-			_, _ = fmt.Fprintln(cmd.OutOrStdout(), line)
-		}
-	}
+	progressHandler("install", fmt.Sprintf("Installing %s@%s...", m.Name, m.Version))
+	statusHandler(fmt.Sprintf("Installing %s@%s", m.Name, m.Version))
 
 	// Install module locally with streaming output
 	if err := m.InstallModuleWithStreaming(ctx, outputHandler); err != nil {
@@ -110,14 +170,13 @@ func runInstall(cmd *cobra.Command, args []string) error {
 	}
 
 	// Store module info in database via server
-	cmd.Println("[store] Saving to database...")
+	progressHandler("store", "Saving to database...")
 	if err := grpcClient.StoreModule(ctx, m); err != nil {
-		cmd.PrintErrf("Warning: failed to store module in database: %v\n", err)
+		progressHandler("warning", fmt.Sprintf("failed to store module in database: %v", err))
 	}
 
-	cmd.Println()
-	cmd.Println("Module installed successfully:", m.Name)
-	cmd.Printf("Show report using: %s report %s\n", cmd.Root().Name(), m.Name)
+	progressHandler("complete", fmt.Sprintf("Module %s installed successfully", m.Name))
+	statusHandler(fmt.Sprintf("Installed %s@%s", m.Name, m.Version))
 
 	return nil
 }

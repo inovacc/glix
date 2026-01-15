@@ -1,8 +1,13 @@
 package cmd
 
 import (
+	"os"
+
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 )
+
+var noTUI bool
 
 var rootCmd = &cobra.Command{
 	Use:   "glix [module]",
@@ -36,4 +41,16 @@ func Execute() {
 
 func init() {
 	rootCmd.CompletionOptions.DisableDefaultCmd = true
+	rootCmd.PersistentFlags().BoolVar(&noTUI, "no-tui", false,
+		"Disable TUI, use plain text output")
+}
+
+// IsTUIEnabled returns whether the TUI should be used
+// Returns false if --no-tui flag is set or if not running in a terminal
+func IsTUIEnabled() bool {
+	if noTUI {
+		return false
+	}
+	// Also disable TUI if not running in a terminal
+	return term.IsTerminal(int(os.Stdout.Fd()))
 }

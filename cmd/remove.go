@@ -1,12 +1,14 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/inovacc/glix/internal/client"
+	"github.com/inovacc/glix/internal/tui"
 	"github.com/spf13/cobra"
 )
 
@@ -29,18 +31,78 @@ func init() {
 }
 
 func runRemove(cmd *cobra.Command, args []string) error {
+	ctx := cmd.Context()
 	input := args[0]
 
 	// Parse module path and version
 	modulePath, version := parseModulePath(input)
 
+	if IsTUIEnabled() {
+		return runRemoveWithTUI(ctx, modulePath, version)
+	}
+
+	return runRemovePlainText(ctx, cmd, modulePath, version)
+}
+
+func runRemoveWithTUI(ctx context.Context, modulePath, version string) error {
+	// Create TUI instance
+	t := tui.New()
+
+	// Create a context that we can cancel when TUI exits
+	tuiCtx, tuiCancel := context.WithCancel(ctx)
+	defer tuiCancel()
+
+	// Channel to communicate errors from the remove goroutine
+	errCh := make(chan error, 1)
+
+	// Run remove in background
+	go func() {
+		errCh <- doRemove(tuiCtx, modulePath, version, t.ProgressHandler(), t.SetStatus)
+	}()
+
+	// Wait for remove to complete
+	go func() {
+		err := <-errCh
+		t.Done(err)
+	}()
+
+	// Run TUI
+	if err := t.Start(tuiCtx); err != nil {
+		return fmt.Errorf("TUI error: %w", err)
+	}
+
+	return nil
+}
+
+func runRemovePlainText(ctx context.Context, cmd *cobra.Command, modulePath, version string) error {
 	cmd.Printf("Removing module: %s", modulePath)
 	if version != "" {
 		cmd.Printf("@%s", version)
 	}
 	cmd.Println()
 
+	progressHandler := func(phase, message string) {
+		cmd.Printf("[%s] %s\n", phase, message)
+	}
+
+	statusHandler := func(text string) {
+		// In plain text mode, we don't need a separate status line
+	}
+
+	return doRemove(ctx, modulePath, version, progressHandler, statusHandler)
+}
+
+func doRemove(
+	ctx context.Context,
+	modulePath, version string,
+	progressHandler func(phase, message string),
+	statusHandler func(text string),
+) error {
+	statusHandler(fmt.Sprintf("Removing %s", modulePath))
+
 	// Try to remove binary from GOBIN
+	progressHandler("binary", "Removing binary from GOBIN...")
+
 	binaryName := filepath.Base(modulePath)
 	if idx := strings.LastIndex(binaryName, "/"); idx != -1 {
 		binaryName = binaryName[idx+1:]
@@ -57,22 +119,30 @@ func runRemove(cmd *cobra.Command, args []string) error {
 	}
 
 	// Try common binary extensions
+	binaryRemoved := false
 	extensions := []string{"", ".exe"}
 	for _, ext := range extensions {
 		binaryPath := filepath.Join(gobin, binaryName+ext)
 		if _, err := os.Stat(binaryPath); err == nil {
 			if err := os.Remove(binaryPath); err != nil {
-				cmd.PrintErrf("Warning: failed to remove binary %s: %v\n", binaryPath, err)
+				progressHandler("warning", fmt.Sprintf("failed to remove binary %s: %v", binaryPath, err))
 			} else {
-				cmd.Printf("Binary removed: %s\n", binaryPath)
+				progressHandler("binary", fmt.Sprintf("Removed: %s", binaryPath))
+				binaryRemoved = true
 			}
 			break
 		}
 	}
 
+	if !binaryRemoved {
+		progressHandler("binary", "Binary not found in GOBIN")
+	}
+
 	// Try to use the gRPC client to remove from database
+	progressHandler("database", "Connecting to server...")
+
 	cfg := client.DefaultDiscoveryConfig()
-	grpcClient, err := client.GetClient(cmd.Context(), cfg)
+	grpcClient, err := client.GetClient(ctx, cfg)
 	if err != nil {
 		return fmt.Errorf("failed to connect to server: %w", err)
 	}
@@ -81,7 +151,8 @@ func runRemove(cmd *cobra.Command, args []string) error {
 	}()
 
 	// Remove from database
-	resp, err := grpcClient.Remove(cmd.Context(), modulePath, version)
+	progressHandler("database", "Removing from database...")
+	resp, err := grpcClient.Remove(ctx, modulePath, version)
 	if err != nil {
 		return fmt.Errorf("failed to remove module from database: %w", err)
 	}
@@ -90,7 +161,8 @@ func runRemove(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to remove module: %s", resp.GetErrorMessage())
 	}
 
-	cmd.Println("Module removed from database")
+	progressHandler("complete", "Module removed successfully")
+	statusHandler(fmt.Sprintf("Removed %s", modulePath))
 
 	return nil
 }
