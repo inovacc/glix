@@ -186,6 +186,7 @@ func runAutoUpdateNow(cmd *cobra.Command, _ []string) error {
 	cmd.Println()
 
 	scheduler := autoupdate.NewScheduler(nil)
+
 	result, err := scheduler.RunOnce(ctx)
 	if err != nil {
 		return fmt.Errorf("update check failed: %w", err)
@@ -202,21 +203,26 @@ func runAutoUpdateNow(cmd *cobra.Command, _ []string) error {
 
 	// Show updates
 	var updated, available, upToDate, errors int
+
 	for _, r := range result.Results {
 		if r.Error != nil {
 			errors++
 			continue
 		}
+
 		if r.NewVersion == r.PreviousVersion {
 			upToDate++
 			continue
 		}
+
 		if r.Updated {
 			updated++
+
 			cmd.Printf("Updated: %s\n", r.Name)
 			cmd.Printf("  %s -> %s\n", r.PreviousVersion, r.NewVersion)
 		} else {
 			available++
+
 			cmd.Printf("Update available: %s\n", r.Name)
 			cmd.Printf("  %s -> %s\n", r.PreviousVersion, r.NewVersion)
 		}
@@ -245,6 +251,7 @@ func runAutoUpdateConfig(cmd *cobra.Command, _ []string) error {
 		}
 
 		cmd.Printf("Interval set to: %s\n", formatDuration(interval))
+
 		changed = true
 	}
 
@@ -253,26 +260,33 @@ func runAutoUpdateConfig(cmd *cobra.Command, _ []string) error {
 		if err := store.SetNotifyOnly(true); err != nil {
 			return err
 		}
+
 		cmd.Println("Mode set to: notify-only (no auto-install)")
+
 		changed = true
 	} else if autoUpdateNoNotify {
 		if err := store.SetNotifyOnly(false); err != nil {
 			return err
 		}
+
 		cmd.Println("Mode set to: auto-install updates")
+
 		changed = true
 	}
 
 	if !changed {
 		// Show current config
 		cfg := store.Get()
+
 		cmd.Println("Current configuration:")
 		cmd.Printf("  Interval:     %s\n", formatDuration(cfg.Interval))
+
 		if cfg.NotifyOnly {
 			cmd.Println("  Mode:         notify-only")
 		} else {
 			cmd.Println("  Mode:         auto-install")
 		}
+
 		cmd.Println()
 		cmd.Println("Use flags to modify:")
 		cmd.Println("  --interval <duration>   Set check interval (e.g., 24h, 12h)")
@@ -288,21 +302,28 @@ func formatDuration(d time.Duration) string {
 	if d < time.Minute {
 		return d.Round(time.Second).String()
 	}
+
 	if d < time.Hour {
 		return fmt.Sprintf("%dm", int(d.Minutes()))
 	}
+
 	if d < 24*time.Hour {
 		hours := int(d.Hours())
+
 		mins := int(d.Minutes()) % 60
 		if mins > 0 {
 			return fmt.Sprintf("%dh%dm", hours, mins)
 		}
+
 		return fmt.Sprintf("%dh", hours)
 	}
+
 	days := int(d.Hours()) / 24
+
 	hours := int(d.Hours()) % 24
 	if hours > 0 {
 		return fmt.Sprintf("%dd%dh", days, hours)
 	}
+
 	return fmt.Sprintf("%dd", days)
 }

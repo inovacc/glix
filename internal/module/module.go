@@ -128,12 +128,14 @@ func (m *Module) FetchModuleInfo(module string) error {
 
 	// Setup dummy mod early for discovery
 	m.progress("init", "Initializing workspace...")
+
 	if err := m.setupTempModule(ctx); err != nil {
 		return err
 	}
 
 	// Get versions from upstream (this also resolves the root module)
 	m.progress("versions", "Fetching available versions...")
+
 	result, err := m.fetchModuleVersions(ctx, module)
 	if err != nil {
 		return err
@@ -145,6 +147,7 @@ func (m *Module) FetchModuleInfo(module string) error {
 
 	// Download the module first to check if it's installable
 	m.progress("download", "Downloading module...")
+
 	if err := m.getModule(ctx, fmt.Sprintf("%s@latest", module)); err != nil {
 		return fmt.Errorf("failed to download module: %w", err)
 	}
@@ -152,6 +155,7 @@ func (m *Module) FetchModuleInfo(module string) error {
 	// Check if the resolved module is installable (has package main)
 	// If not, trigger smart detection to find CLI paths using the ROOT module
 	m.progress("check", "Checking if module is installable...")
+
 	if !m.hasPackageMain(ctx, module) {
 		m.progress("discover", "Searching for CLI binaries...")
 		fmt.Printf("Module %q found but is not installable (no main package), searching for CLIs...\n", module)
@@ -188,6 +192,7 @@ func (m *Module) FetchModuleInfo(module string) error {
 	// (we already downloaded @latest above for the installability check)
 	if version != "latest" && version != lr.Version {
 		m.progress("download", fmt.Sprintf("Downloading %s...", version))
+
 		if err := m.getModule(ctx, fmt.Sprintf("%s@%s", module, version)); err != nil {
 			return err
 		}

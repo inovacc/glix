@@ -56,7 +56,9 @@ func (s *Server) Remove(ctx context.Context, req *pb.RemoveRequest) (*pb.RemoveR
 
 		// Remove all versions found
 		var lastErr error
+
 		removed := 0
+
 		for _, mod := range mods {
 			if err := s.db.DeleteModule(mod.GetName(), mod.GetVersion()); err != nil {
 				lastErr = err

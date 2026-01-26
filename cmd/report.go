@@ -36,10 +36,12 @@ func runReport(cmd *cobra.Command, args []string) error {
 
 	// Try to use the gRPC client
 	cfg := client.DefaultDiscoveryConfig()
+
 	grpcClient, err := client.GetClient(cmd.Context(), cfg)
 	if err != nil {
 		return fmt.Errorf("failed to connect to server: %w", err)
 	}
+
 	defer func() {
 		_ = grpcClient.Close()
 	}()
@@ -52,9 +54,11 @@ func runReport(cmd *cobra.Command, args []string) error {
 
 	if !resp.GetFound() {
 		cmd.Printf("Module %q not found in database\n", moduleName)
+
 		if reportVersion != "" {
 			cmd.Printf("Try without --version flag to see all installed versions\n")
 		}
+
 		return nil
 	}
 
@@ -78,10 +82,9 @@ func runReport(cmd *cobra.Command, args []string) error {
 		cmd.Printf("Available versions: %d\n", len(mod.GetVersions()))
 		// Show up to 5 most recent versions
 		versions := mod.GetVersions()
-		showCount := 5
-		if len(versions) < showCount {
-			showCount = len(versions)
-		}
+
+		showCount := min(len(versions), 5)
+
 		cmd.Printf("Latest versions: %v\n", versions[:showCount])
 	}
 
@@ -89,6 +92,7 @@ func runReport(cmd *cobra.Command, args []string) error {
 	deps := mod.GetDependencies()
 	if len(deps) > 0 {
 		cmd.Printf("\nDependencies (%d):\n", len(deps))
+
 		for _, dep := range deps {
 			cmd.Printf("  - %s@%s\n", dep.GetName(), dep.GetVersion())
 		}

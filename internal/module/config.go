@@ -54,5 +54,6 @@ func GetApplicationConfigDirectory() (string, error) {
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		return "", err
 	}
+
 	return configDir, nil
 }

@@ -159,3 +159,14 @@ tasks:
       GITHUB_OWNER: "{{.GITHUB_OWNER}}"
     cmds:
       - goreleaser check
+
+  # === DOCUMENTATION ===
+  cmdtree:
+    desc: Generate command tree visualization
+    cmds:
+      - go run scripts/cmdtree/cmdtree.go
+
+  cmdtree:save:
+    desc: Generate command tree and save to docs/COMMANDS.md
+    cmds:
+      - go run scripts/cmdtree/cmdtree.go -out-tree docs/COMMANDS.md -out-go cmd/cmdtree.go

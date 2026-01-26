@@ -40,10 +40,12 @@ func init() {
 func runList(cmd *cobra.Command, args []string) error {
 	// Try to use the gRPC client
 	cfg := client.DefaultDiscoveryConfig()
+
 	grpcClient, err := client.GetClient(cmd.Context(), cfg)
 	if err != nil {
 		return fmt.Errorf("failed to connect to server: %w", err)
 	}
+
 	defer func() {
 		_ = grpcClient.Close()
 	}()
@@ -57,9 +59,11 @@ func runList(cmd *cobra.Command, args []string) error {
 	modules := resp.GetModules()
 	if len(modules) == 0 {
 		cmd.Println("No modules installed")
+
 		if listFilter != "" {
 			cmd.Printf("(filter: %q)\n", listFilter)
 		}
+
 		return nil
 	}
 
@@ -70,6 +74,7 @@ func runList(cmd *cobra.Command, args []string) error {
 	for _, mod := range modules {
 		// Format installation time
 		installedAt := ""
+
 		if mod.GetTimestampUnixNano() > 0 {
 			t := time.Unix(0, mod.GetTimestampUnixNano())
 			installedAt = t.Format("2006-01-02 15:04")
@@ -79,6 +84,7 @@ func runList(cmd *cobra.Command, args []string) error {
 		depCount := len(mod.GetDependencies())
 
 		cmd.Printf("  %s@%s\n", mod.GetName(), mod.GetVersion())
+
 		if installedAt != "" {
 			cmd.Printf("    Installed: %s | Dependencies: %d\n", installedAt, depCount)
 		}

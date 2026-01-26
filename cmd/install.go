@@ -83,9 +83,11 @@ func runInstallWithTUI(ctx context.Context, cmd *cobra.Command, modulePath, vers
 
 func runInstallPlainText(ctx context.Context, cmd *cobra.Command, modulePath, version string) error {
 	cmd.Printf("Installing module: %s", modulePath)
+
 	if version != "" {
 		cmd.Printf("@%s", version)
 	}
+
 	cmd.Println()
 
 	progressHandler := func(phase, message string) {
@@ -119,10 +121,12 @@ func doInstall(
 
 	// Connect to server first (starts on-demand server if needed)
 	cfg := client.DefaultDiscoveryConfig()
+
 	grpcClient, err := client.GetClient(ctx, cfg)
 	if err != nil {
 		return fmt.Errorf("failed to connect to server: %w", err)
 	}
+
 	defer func() {
 		_ = grpcClient.Close()
 	}()
@@ -137,6 +141,7 @@ func doInstall(
 	if err := os.MkdirAll(workDir, 0755); err != nil {
 		return fmt.Errorf("failed to create working directory: %w", err)
 	}
+
 	defer func() {
 		_ = os.RemoveAll(workDir)
 	}()
@@ -171,6 +176,7 @@ func doInstall(
 
 	// Store module info in database via server
 	progressHandler("store", "Saving to database...")
+
 	if err := grpcClient.StoreModule(ctx, m); err != nil {
 		progressHandler("warning", fmt.Sprintf("failed to store module in database: %v", err))
 	}

@@ -76,17 +76,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case DoneMsg:
 		m.done = true
+
 		m.err = msg.Error
 		if msg.Error != nil {
 			m.status = fmt.Sprintf("Error: %v", msg.Error)
 		} else {
 			m.status = "Completed successfully"
 		}
+
 		return m, tea.Quit
 
 	case spinner.TickMsg:
 		var cmd tea.Cmd
+
 		m.spinner, cmd = m.spinner.Update(msg)
+
 		return m, cmd
 	}
 
@@ -121,17 +125,20 @@ func (m Model) View() string {
 		b.WriteString(PhaseStyle.Render(m.phase))
 		b.WriteString(" ")
 	}
+
 	b.WriteString(MessageStyle.Render(m.message))
 	b.WriteString("\n\n")
 
 	// Log view
 	for _, entry := range m.logs {
 		b.WriteString("  ")
+
 		if entry.isStderr {
 			b.WriteString(StderrStyle.Render(entry.text))
 		} else {
 			b.WriteString(LogStyle.Render(entry.text))
 		}
+
 		b.WriteString("\n")
 	}
 
@@ -145,6 +152,7 @@ func (m Model) View() string {
 
 	// Status bar
 	b.WriteString("\n")
+
 	if m.err != nil {
 		b.WriteString(ErrorStyle.Render(m.status))
 	} else if m.done {
@@ -152,6 +160,7 @@ func (m Model) View() string {
 	} else {
 		b.WriteString(StatusStyle.Render(m.status))
 	}
+
 	b.WriteString("\n")
 
 	return b.String()

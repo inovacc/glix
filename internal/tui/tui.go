@@ -28,10 +28,12 @@ func New() *TUI {
 // This function blocks until the TUI exits
 func (t *TUI) Start(ctx context.Context) error {
 	t.mu.Lock()
+
 	if t.running {
 		t.mu.Unlock()
 		return nil
 	}
+
 	t.running = true
 	t.mu.Unlock()
 
@@ -49,6 +51,7 @@ func (t *TUI) Start(ctx context.Context) error {
 	_, err := t.program.Run()
 
 	close(t.done)
+
 	return err
 }
 

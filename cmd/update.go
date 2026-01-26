@@ -107,16 +107,19 @@ func doUpdate(
 
 	// Connect to server to get current module info
 	cfg := client.DefaultDiscoveryConfig()
+
 	grpcClient, err := client.GetClient(ctx, cfg)
 	if err != nil {
 		return fmt.Errorf("failed to connect to server: %w", err)
 	}
+
 	defer func() {
 		_ = grpcClient.Close()
 	}()
 
 	// Get currently installed module
 	progressHandler("check", "Checking installed version...")
+
 	resp, err := grpcClient.GetModule(ctx, modulePath, "")
 	if err != nil {
 		return fmt.Errorf("failed to query module: %w", err)
@@ -141,6 +144,7 @@ func doUpdate(
 	if err := os.MkdirAll(workDir, 0755); err != nil {
 		return fmt.Errorf("failed to create working directory: %w", err)
 	}
+
 	defer func() {
 		_ = os.RemoveAll(workDir)
 	}()
@@ -156,6 +160,7 @@ func doUpdate(
 
 	// Fetch latest module info
 	progressHandler("fetch", "Fetching latest version information...")
+
 	if err := m.FetchModuleInfo(modulePath); err != nil {
 		return fmt.Errorf("failed to fetch module info: %w", err)
 	}
@@ -166,6 +171,7 @@ func doUpdate(
 	if !isNewerVersion(latestVersion, installedVersion) {
 		progressHandler("complete", fmt.Sprintf("Already at latest version: %s@%s", modulePath, installedVersion))
 		statusHandler(fmt.Sprintf("Up to date: %s@%s", modulePath, installedVersion))
+
 		return nil
 	}
 
@@ -179,6 +185,7 @@ func doUpdate(
 
 	// Store updated module info in database via server
 	progressHandler("store", "Saving to database...")
+
 	if err := grpcClient.StoreModule(ctx, m); err != nil {
 		progressHandler("warning", fmt.Sprintf("failed to update module in database: %v", err))
 	}
@@ -195,6 +202,7 @@ func isNewerVersion(newVer, oldVer string) bool {
 	if newVer != "" && newVer[0] != 'v' {
 		newVer = "v" + newVer
 	}
+
 	if oldVer != "" && oldVer[0] != 'v' {
 		oldVer = "v" + oldVer
 	}

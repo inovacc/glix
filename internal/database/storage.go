@@ -96,6 +96,7 @@ func (s *Storage) UpsertModule(module *pb.ModuleProto) error {
 
 		// Check if the module already exists and remove the old time index entry
 		bucket := tx.Bucket(modulesBucket)
+
 		existingData := bucket.Get(key)
 		if existingData != nil {
 			existingModule := &pb.ModuleProto{}

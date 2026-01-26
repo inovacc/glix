@@ -36,6 +36,7 @@ func runServiceStatus(cmd *cobra.Command, args []string) error {
 			cmd.Printf("  Installed: %v\n", mgr.IsInstalled())
 			cmd.Printf("  Running:   %v\n", status.Running)
 			cmd.Printf("  Status:    %s\n", status.Description)
+
 			if status.PID > 0 {
 				cmd.Printf("  PID:       %d\n", status.PID)
 			}
@@ -56,8 +57,10 @@ func runServiceStatus(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		cmd.Printf("  Status:  Not running\n")
 		cmd.Printf("  Address: %s\n", cfg.Address)
+
 		return nil
 	}
+
 	defer func() {
 		_ = grpcClient.Close()
 	}()
@@ -67,6 +70,7 @@ func runServiceStatus(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		cmd.Printf("  Status:  Not responding\n")
 		cmd.Printf("  Address: %s\n", cfg.Address)
+
 		return nil
 	}
 

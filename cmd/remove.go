@@ -76,9 +76,11 @@ func runRemoveWithTUI(ctx context.Context, modulePath, version string) error {
 
 func runRemovePlainText(ctx context.Context, cmd *cobra.Command, modulePath, version string) error {
 	cmd.Printf("Removing module: %s", modulePath)
+
 	if version != "" {
 		cmd.Printf("@%s", version)
 	}
+
 	cmd.Println()
 
 	progressHandler := func(phase, message string) {
@@ -115,11 +117,13 @@ func doRemove(
 			home, _ := os.UserHomeDir()
 			gopath = filepath.Join(home, "go")
 		}
+
 		gobin = filepath.Join(gopath, "bin")
 	}
 
 	// Try common binary extensions
 	binaryRemoved := false
+
 	extensions := []string{"", ".exe"}
 	for _, ext := range extensions {
 		binaryPath := filepath.Join(gobin, binaryName+ext)
@@ -128,8 +132,10 @@ func doRemove(
 				progressHandler("warning", fmt.Sprintf("failed to remove binary %s: %v", binaryPath, err))
 			} else {
 				progressHandler("binary", fmt.Sprintf("Removed: %s", binaryPath))
+
 				binaryRemoved = true
 			}
+
 			break
 		}
 	}
@@ -142,16 +148,19 @@ func doRemove(
 	progressHandler("database", "Connecting to server...")
 
 	cfg := client.DefaultDiscoveryConfig()
+
 	grpcClient, err := client.GetClient(ctx, cfg)
 	if err != nil {
 		return fmt.Errorf("failed to connect to server: %w", err)
 	}
+
 	defer func() {
 		_ = grpcClient.Close()
 	}()
 
 	// Remove from database
 	progressHandler("database", "Removing from database...")
+
 	resp, err := grpcClient.Remove(ctx, modulePath, version)
 	if err != nil {
 		return fmt.Errorf("failed to remove module from database: %w", err)

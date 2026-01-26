@@ -117,17 +117,21 @@ func doMonitor(
 
 	// Connect to server
 	progressHandler("connect", "Connecting to server...")
+
 	cfg := client.DefaultDiscoveryConfig()
+
 	grpcClient, err := client.GetClient(ctx, cfg)
 	if err != nil {
 		return fmt.Errorf("failed to connect to server: %w", err)
 	}
+
 	defer func() {
 		_ = grpcClient.Close()
 	}()
 
 	// List all installed modules
 	progressHandler("list", "Listing installed modules...")
+
 	resp, err := grpcClient.ListModules(ctx, 0, 0, "")
 	if err != nil {
 		return fmt.Errorf("failed to list modules: %w", err)
@@ -137,6 +141,7 @@ func doMonitor(
 	if len(modules) == 0 {
 		progressHandler("complete", "No modules installed")
 		statusHandler("No modules installed")
+
 		return nil
 	}
 
@@ -145,17 +150,24 @@ func doMonitor(
 
 	// Check each module for updates concurrently
 	statuses := make([]moduleStatus, len(modules))
-	var wg sync.WaitGroup
-	var mu sync.Mutex
+
+	var (
+		wg sync.WaitGroup
+		mu sync.Mutex
+	)
+
 	checked := 0
 
 	for i, mod := range modules {
 		wg.Add(1)
+
 		go func(idx int, modName, modVersion string) {
 			defer wg.Done()
+
 			statuses[idx] = checkModuleUpdate(ctx, modName, modVersion)
 
 			mu.Lock()
+
 			checked++
 			progressHandler("check", fmt.Sprintf("Checked %d/%d: %s", checked, len(modules), modName))
 			mu.Unlock()
@@ -165,9 +177,11 @@ func doMonitor(
 	wg.Wait()
 
 	// Categorize results
-	var updatesAvailable []moduleStatus
-	var upToDate []moduleStatus
-	var errors []moduleStatus
+	var (
+		updatesAvailable []moduleStatus
+		upToDate         []moduleStatus
+		errors           []moduleStatus
+	)
 
 	for _, status := range statuses {
 		if status.Error != nil {
@@ -182,6 +196,7 @@ func doMonitor(
 	// Report results
 	if len(updatesAvailable) > 0 {
 		progressHandler("result", fmt.Sprintf("%d update(s) available:", len(updatesAvailable)))
+
 		for _, s := range updatesAvailable {
 			outputHandler("stdout", fmt.Sprintf("  %s: %s -> %s", s.Name, s.InstalledVersion, s.LatestVersion))
 		}
@@ -193,6 +208,7 @@ func doMonitor(
 
 	if len(errors) > 0 {
 		progressHandler("result", fmt.Sprintf("%d error(s):", len(errors)))
+
 		for _, s := range errors {
 			outputHandler("stderr", fmt.Sprintf("  %s: %v", s.Name, s.Error))
 		}
@@ -247,6 +263,7 @@ func checkModuleUpdate(ctx context.Context, moduleName, installedVersion string)
 		status.Error = err
 		return status
 	}
+
 	defer func() {
 		_ = os.RemoveAll(workDir)
 	}()
@@ -282,6 +299,7 @@ func updateModuleCore(ctx context.Context, grpcClient *client.Client, moduleName
 	if err := os.MkdirAll(workDir, 0755); err != nil {
 		return err
 	}
+
 	defer func() {
 		_ = os.RemoveAll(workDir)
 	}()

@@ -72,6 +72,7 @@ func (s *Scheduler) SetAddress(address string) {
 // Start begins the auto-update scheduler
 func (s *Scheduler) Start(ctx context.Context) {
 	s.mu.Lock()
+
 	if s.running {
 		s.mu.Unlock()
 		return
@@ -82,6 +83,7 @@ func (s *Scheduler) Start(ctx context.Context) {
 	s.mu.Unlock()
 
 	s.wg.Add(1)
+
 	go s.run(ctx)
 
 	s.logger.Info("auto-update scheduler started")
@@ -90,6 +92,7 @@ func (s *Scheduler) Start(ctx context.Context) {
 // Stop stops the auto-update scheduler
 func (s *Scheduler) Stop() {
 	s.mu.Lock()
+
 	if !s.running {
 		s.mu.Unlock()
 		return
@@ -98,6 +101,7 @@ func (s *Scheduler) Stop() {
 	if s.cancel != nil {
 		s.cancel()
 	}
+
 	s.running = false
 	s.mu.Unlock()
 
@@ -109,6 +113,7 @@ func (s *Scheduler) Stop() {
 func (s *Scheduler) IsRunning() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
 	return s.running
 }
 
@@ -191,6 +196,7 @@ func (s *Scheduler) CheckAndUpdate(ctx context.Context) (*CheckResult, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	defer func() {
 		_ = conn.Close()
 	}()
@@ -245,6 +251,7 @@ func (s *Scheduler) checkModule(ctx context.Context, name, installedVersion stri
 		result.Error = err
 		return result
 	}
+
 	defer func() {
 		_ = os.RemoveAll(workDir)
 	}()
@@ -296,6 +303,7 @@ func (s *Scheduler) checkModule(ctx context.Context, name, installedVersion stri
 	}
 
 	result.Updated = true
+
 	s.logger.Info("module updated",
 		"module", name,
 		"from", installedVersion,
@@ -352,6 +360,7 @@ func isNewerVersion(newVer, oldVer string) bool {
 	if newVer != "" && newVer[0] != 'v' {
 		newVer = "v" + newVer
 	}
+
 	if oldVer != "" && oldVer[0] != 'v' {
 		oldVer = "v" + oldVer
 	}
@@ -386,10 +395,12 @@ func (s *Scheduler) Ping(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+
 	defer func() {
 		_ = conn.Close()
 	}()
 
 	_, err = client.Ping(ctx, &emptypb.Empty{})
+
 	return err
 }

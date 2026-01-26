@@ -39,6 +39,11 @@ func Execute() {
 	cobra.CheckErr(rootCmd.Execute())
 }
 
+// GetRootCmd returns the root command for introspection purposes.
+func GetRootCmd() *cobra.Command {
+	return rootCmd
+}
+
 func init() {
 	rootCmd.CompletionOptions.DisableDefaultCmd = true
 	rootCmd.PersistentFlags().BoolVar(&noTUI, "no-tui", false,

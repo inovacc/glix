@@ -45,6 +45,7 @@ func getConfigPath() string {
 		// Fallback to cache directory
 		configDir, _ = module.GetApplicationCacheDirectory()
 	}
+
 	return filepath.Join(configDir, "autoupdate.json")
 }
 
@@ -61,6 +62,7 @@ func GetStore() *configStore {
 		// Load existing config if available
 		_ = store.load()
 	})
+
 	return store
 }
 
@@ -74,6 +76,7 @@ func (s *configStore) load() error {
 		if os.IsNotExist(err) {
 			return nil // Use defaults
 		}
+
 		return fmt.Errorf("failed to read config: %w", err)
 	}
 
@@ -83,6 +86,7 @@ func (s *configStore) load() error {
 	}
 
 	s.config = cfg
+
 	return nil
 }
 
@@ -110,6 +114,7 @@ func (s *configStore) save() error {
 func (s *configStore) Get() Config {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+
 	return s.config
 }
 
@@ -119,6 +124,7 @@ func (s *configStore) SetEnabled(enabled bool) error {
 	defer s.mu.Unlock()
 
 	s.config.Enabled = enabled
+
 	return s.save()
 }
 
@@ -132,6 +138,7 @@ func (s *configStore) SetInterval(interval time.Duration) error {
 	}
 
 	s.config.Interval = interval
+
 	return s.save()
 }
 
@@ -141,6 +148,7 @@ func (s *configStore) SetNotifyOnly(notifyOnly bool) error {
 	defer s.mu.Unlock()
 
 	s.config.NotifyOnly = notifyOnly
+
 	return s.save()
 }
 
@@ -150,6 +158,7 @@ func (s *configStore) RecordCheck(updatedCount int) error {
 	defer s.mu.Unlock()
 
 	s.config.LastCheck = time.Now()
+
 	s.config.CheckedCount++
 	if updatedCount > 0 {
 		s.config.LastUpdate = time.Now()
