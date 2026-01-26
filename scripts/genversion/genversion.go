@@ -7,12 +7,11 @@ import (
 )
 
 func main() {
-	opts := genversioninfo.Options{
-		GoVersionPath:    ".go-version",
-		CobraVersionPath: "cmd/version.go",
-	}
-
-	if err := genversioninfo.GenVersionInfo(opts); err != nil {
+	// GenWithCobraCLI generates:
+	// - VERSION file (JSON with all metadata) in the root
+	// - cmd/VERSION file (version string for embedding)
+	// - cmd/version.go (Cobra command with embedded VERSION)
+	if err := genversioninfo.GenWithCobraCLI(); err != nil {
 		panic(err)
 	}
 }
