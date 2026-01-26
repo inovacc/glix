@@ -10,7 +10,6 @@ import (
 
 const commandTree = `# Command Tree
 
-```
 glix [module]
 +-- auto-update                              # Manage automatic update settings
 |   +-- config                               # Configure auto-update settings
@@ -18,6 +17,7 @@ glix [module]
 |   +-- enable                               # Enable automatic updates
 |   +-- now                                  # Run update check immediately
 |   \-- status                               # Show auto-update status
++-- cmdtree                                  # Display command tree visualization
 +-- install                                  # Install a Go module
 +-- list                                     # List all installed modules
 +-- monitor                                  # Check all installed modules for avail...
@@ -31,7 +31,6 @@ glix [module]
 |   \-- uninstall                            # Remove the glix service from the system
 +-- update                                   # Update an installed Go module to the ...
 \-- version                                  # Print version information
-```
 `
 
 var cmdtreeCmd = &cobra.Command{
@@ -46,4 +45,3 @@ var cmdtreeCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(cmdtreeCmd)
 }
-

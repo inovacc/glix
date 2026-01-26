@@ -91,15 +91,13 @@ func main() {
 	}
 }
 
-func buildTree(root *cobra.Command) string {
+func buildTree(root *cobra.Command) []byte {
 	var buf bytes.Buffer
 
-	buf.WriteString("# Command Tree\n\n```\n")
 	buf.WriteString(fmt.Sprintf("%s\n", root.Use))
 	printCommands(&buf, root.Commands(), "")
-	buf.WriteString("```\n")
 
-	return buf.String()
+	return buf.Bytes()
 }
 
 func printCommands(w io.Writer, commands []*cobra.Command, prefix string) {
@@ -153,17 +151,27 @@ func printCommands(w io.Writer, commands []*cobra.Command, prefix string) {
 	}
 }
 
-func writeFile(path, content string) {
+func writeFile(path string, buf []byte) {
 	f, err := os.Create(path)
 	if err != nil {
 		panic(err)
 	}
 	defer f.Close()
 
-	_, _ = f.WriteString(content)
+	var tree bytes.Buffer
+
+	tree.WriteString("# Command Tree\n\n```\n")
+	tree.Write(buf)
+
+	_, _ = f.WriteString(tree.String())
 }
 
-func generateGoFile(path, tree string) {
+func generateGoFile(path string, buf []byte) {
+	var tree bytes.Buffer
+
+	tree.WriteString("# Command Tree\n\n")
+	tree.Write(buf)
+
 	tmpl := template.Must(template.New("cmdtree").Parse(goTemplate))
 
 	f, err := os.Create(path)
@@ -172,7 +180,7 @@ func generateGoFile(path, tree string) {
 	}
 	defer f.Close()
 
-	if err = tmpl.Execute(f, map[string]string{"Tree": tree}); err != nil {
+	if err = tmpl.Execute(f, map[string]string{"Tree": tree.String()}); err != nil {
 		panic(err)
 	}
 }
